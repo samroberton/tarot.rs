@@ -1,5 +1,6 @@
 use http::Method;
 use lambda_http::Error as LambdaError;
+use uuid::Uuid;
 
 use crate::db::{get_game, get_hands, put_game, put_hand};
 use crate::scoring;
@@ -18,9 +19,13 @@ pub async fn handle(
         match (method, route, form_data) {
             (&Method::GET, Route::Index, _) => Response::CreateGamePage,
             (&Method::POST, Route::Games, Some(form_data)) => {
-                let game = http_utils::new_game(form_data);
-                put_game(client, &game).await?;
-                Response::RedirectToGame(game)
+                match http_utils::form_data_to_game(Uuid::new_v4().to_string(), form_data) {
+                    Ok(game) => {
+                        put_game(client, &game).await?;
+                        Response::RedirectToGame(game)
+                    },
+                    Err(e) => Response::ValidationError(e.to_string()),
+                }
             }
             (&Method::GET, Route::Game(game_id), _) => {
                 if let Some(game) = get_game(client, &game_id).await? {
@@ -46,17 +51,21 @@ pub async fn handle(
                 }
             }
             (&Method::POST, Route::Game(game_id), Some(form_data)) => {
-                if let Some(mut game) = get_game(client, &game_id).await? {
-                    game = http_utils::edit_game(game, form_data);
-                    put_game(&client, &game).await?;
-                    Response::RedirectToGame(game)
+                if let Some(game) = get_game(client, &game_id).await? {
+                    match http_utils::form_data_to_game(game.game_id, form_data) {
+                        Ok(game) => {
+                            put_game(client, &game).await?;
+                            Response::RedirectToGame(game)
+                        },
+                        Err(e) => Response::ValidationError(e.to_string())
+                    }
                 } else {
                     Response::GameNotFound(game_id)
                 }
             }
             (&Method::POST, Route::GameHands(game_id), Some(form_data)) => {
                 if let Some(game) = get_game(client, &game_id).await? {
-                    match http_utils::new_hand(form_data) {
+                    match http_utils::form_data_to_hand(form_data) {
                         Ok(hand) => {
                             put_hand(&client, &game_id, &hand).await?;
                             Response::RedirectToGame(game)

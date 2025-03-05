@@ -1,3 +1,4 @@
 /lambda/target
-/lambda/.env
+.env
+.env.fish
 .DS_Store

@@ -2,11 +2,13 @@ use std::fmt;
 use std::str::FromStr;
 
 #[derive(Debug)]
-pub struct ValidationError(String);
+pub struct ValidationError{
+    pub msg: String
+}
 
 impl fmt::Display for ValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Invalid value: {}", self.0)
+        write!(f, "Invalid value: {}", self.msg)
     }
 }
 
@@ -38,7 +40,7 @@ impl FromStr for Bid {
             "garde" => Ok(Bid::Garde),
             "garde sans" => Ok(Bid::GardeSans),
             "garde contre" => Ok(Bid::GardeContre),
-            _ => Err(ValidationError(s.to_string())),
+            _ => Err(ValidationError { msg: s.to_string() }),
         }
     }
 }
@@ -72,7 +74,7 @@ impl FromStr for Poignée {
             "simple" => Ok(Poignée::Simple),
             "double" => Ok(Poignée::Double),
             "triple" => Ok(Poignée::Triple),
-            _ => Err(ValidationError(s.to_string())),
+            _ => Err(ValidationError { msg: s.to_string() }),
         }
     }
 }
@@ -102,7 +104,7 @@ impl FromStr for Chelem {
             "aucun" => Ok(Chelem::Aucun),
             "non annoncé" => Ok(Chelem::NonAnnoncé),
             "annoncé" => Ok(Chelem::Annoncé),
-            _ => Err(ValidationError(s.to_string())),
+            _ => Err(ValidationError { msg: s.to_string() }),
         }
     }
 }

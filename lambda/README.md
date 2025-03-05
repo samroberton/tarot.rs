@@ -7,8 +7,12 @@ cargo install cargo-lambda
 # Development
 
 ```bash
-source .env
-cargo lambda watch --env-file .env
+source ../.env     # `source ../.env.fish` if using fish
+cargo lambda watch --env-file ../.env
 ```
 
-Accessible on [localhost:9000](http://localhost:9000).
+```bash
+caddy run --config Caddyfile
+```
+
+Accessible on [localhost:8080](http://localhost:8080).

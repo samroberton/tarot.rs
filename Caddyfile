@@ -1,0 +1,14 @@
+{
+    skip_install_trust
+}
+
+http://localhost:8080 {
+    handle_path /assets/* {
+        root * ./assets
+        file_server
+    }
+    
+    handle {
+        reverse_proxy localhost:9000
+    }
+}

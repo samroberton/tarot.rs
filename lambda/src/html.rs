@@ -3,78 +3,21 @@ use std::collections::HashMap;
 use maud::{html, Markup, DOCTYPE};
 use crate::game::{CompletedHand, Game};
 
-const STYLES: &str = r#"
-    body {
-        max-width: 600px;
-        margin: 0 auto;
-        font-family: system-ui, -apple-system, sans-serif;
-        line-height: 1.5;
-        padding: 2rem;
-    }
-    
-    form {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-    }
-    
-    label {
-        display: block;
-        margin-bottom: 0.5rem;
-    }
-    
-    input, select {
-        padding: 0.5rem;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        font-size: 1rem;
-        width: 100%;
-        box-sizing: border-box;
-    }
-    
-    select[multiple] {
-        height: 8rem;
-    }
-    
-    button {
-        padding: 0.75rem 1.5rem;
-        background-color: #0066cc;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 1rem;
-    }
-    
-    button:hover {
-        background-color: #0052a3;
-    }
-    
-    .checkbox-wrapper {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-    
-    .checkbox-wrapper input[type="checkbox"] {
-        width: 1.2rem;
-        height: 1.2rem;
-    }
-
-    .form-group {
-        margin-bottom: 1rem;
-    }
-"#;
-
 fn layout(content: Markup) -> Markup {
+    let script_file = std::env::var("SCRIPT_JS").unwrap_or("script.js".to_string());
+    let script_url = format!("/assets/{}", script_file);
+    let style_file = std::env::var("STYLES_CSS").unwrap_or("styles.css".to_string());
+    let style_url = format!("/assets/{}", style_file);
+
     html! {
         (DOCTYPE)
         html {
             head {
                 title { "Tarot" }
-                style { (STYLES) }
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1.0";
+                link rel="stylesheet" href=(style_url);
+                script src=(script_url) async {}
             }
             body {
                 (content)

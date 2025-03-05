@@ -1,5 +1,3 @@
-use uuid::Uuid;
-
 use crate::game::{Bid, Chelem, CompletedHand, Game, Poignée, ValidationError};
 
 fn lines(s: &str) -> Vec<String> {
@@ -9,85 +7,79 @@ fn lines(s: &str) -> Vec<String> {
         .collect()
 }
 
-fn get_value(form_data: &Vec<(String, String)>, key: &str) -> String {
+fn form_value<'a>(form_data: &'a Vec<(String, String)>, key: &'a str) -> Option<&'a String> {
     form_data
         .iter()
         .find(|(k, _)| k == key)
-        .map(|(_, v)| v.clone())
-        .unwrap_or_default()
+        .map(|(_, v)| v)
 }
 
-fn get_vec_values(form_data: &Vec<(String, String)>, key: &str) -> Vec<String> {
+fn bool_form_value(form_data: &Vec<(String, String)>, key: &str) -> bool {
+    form_value(form_data, key).map(|s| s.to_lowercase() == "on").unwrap_or(false)
+}
+
+fn form_values<'a>(form_data: &'a Vec<(String, String)>, key: &str) -> Vec<&'a String> {
     form_data
         .iter()
         .filter(|(k, _)| k.starts_with(key))
-        .map(|(_, v)| v.clone())
+        .map(|(_, v)| v)
         .collect()
 }
 
-pub fn new_game(form_data: &Vec<(String, String)>) -> Game {
-   let game = Game {
-        game_id: Uuid::new_v4().to_string(),
-        date: "".to_string(),
-        host: "".to_string(),
-        players: vec![],
-        tables: vec![],
-    };
-    edit_game(game, form_data)
+fn reqd_form_value<'a>(form_data: &'a Vec<(String, String)>, key: &'a str) -> Result<&'a String, ValidationError> {
+    form_value(form_data, key).ok_or(ValidationError { msg: format!("Missing required field: {}", key) })
 }
 
-pub fn find(form_data: &Vec<(String, String)>, param: &str) -> Option<String> {
-    form_data
-        .iter()
-        .find(|(key, _)| key == param)
-        .map(|(_, value)| value.clone())
+pub fn form_data_to_game(game_id: String, form_data: &Vec<(String, String)>) -> Result<Game, ValidationError> {
+   Ok(Game {
+        game_id,
+        date: reqd_form_value(form_data, "date")?.clone(),
+        host: reqd_form_value(form_data, "host")?.clone(),
+        players: if let Some(players) = form_value(form_data, "players") {
+            lines(&players)
+        } else {
+            vec![]
+        },
+        tables: if let Some(tables) = form_value(form_data, "tables") {
+            lines(&tables)
+        } else {
+            vec![]
+        }
+    })
 }
 
-pub fn edit_game(mut game: Game, form_data: &Vec<(String, String)>) -> Game {
-    game.date = find(form_data, "date").unwrap();
-    game.host = find(form_data, "host").unwrap();
-    if let Some(players) = find(form_data, "players") {
-        game.players = lines(&players);
-    } else {
-        game.players = vec![];
-    }
-    if let Some(tables) = find(form_data, "tables") {
-        game.tables = lines(&tables);
-    } else {
-        game.players = vec![];
-    }
-    game
-}
-
-pub fn new_hand(form_data: &Vec<(String, String)>) -> Result<CompletedHand, ValidationError> {
-    let table = get_value(form_data, "table");
-    let bidder = get_value(form_data, "bidder");
-    let partner = if get_value(form_data, "partner").is_empty() {
-        None
-    } else {
-        Some(get_value(form_data, "partner"))
-    };
-
-    // Get numeric values
-    let hand_number = get_value(form_data, "handNumber")
-        .parse::<i32>()
-        .unwrap();
-    let won_or_lost_by = get_value(form_data, "wonOrLostBy")
+pub fn form_data_to_hand(form_data: &Vec<(String, String)>) -> Result<CompletedHand, ValidationError> {
+    let table = reqd_form_value(form_data, "table")?.clone();
+    let hand_number = reqd_form_value(form_data, "handNumber")?
         .parse::<i32>()
         .unwrap();
 
-    // Get boolean values
-    let won = get_value(form_data, "won").to_lowercase() == "on";
-    let petit_au_bout = get_value(form_data, "petitAuBout").to_lowercase() == "on";
+    let bidder = reqd_form_value(form_data, "bidder")?.clone();
+    let partner = match form_value(form_data, "partner") {
+        None => None,
+        Some(s) if s.is_empty() => None,
+        Some(s) => Some(s.clone())
+    };
+    let defence: Vec<String> = form_values(form_data, "defence").iter().map(|s| (*s).clone()).collect();
+    if defence.is_empty() {
+        return Err(ValidationError { msg: "Missing required field: defence".to_string() });
+    }
 
-    // Get vectors
-    let players = get_vec_values(form_data, "players");
-    let defence = get_vec_values(form_data, "defence");
+    // `players` is always inferred for a completed hand, regardless of what was supplied.
+    let mut players = defence.clone();
+    players.push(bidder.clone());
+    if let Some(ref partner) = partner {
+        players.push(partner.clone());
+    }
 
-    // Get enums (assuming you have From<String> implementations or similar)
-    let bid = get_value(form_data, "bid").parse::<Bid>().unwrap();
-    let poignee = get_value(form_data, "poignee").parse::<Poignée>().unwrap();
-    let chelem = get_value(form_data, "chelem").parse::<Chelem>().unwrap();
+    let bid = reqd_form_value(form_data, "bid")?.parse::<Bid>().unwrap();
+    let won = bool_form_value(form_data, "won");
+    let won_or_lost_by = reqd_form_value(form_data, "wonOrLostBy")?
+        .parse::<i32>()
+        .unwrap();
+    let petit_au_bout = bool_form_value(form_data, "petitAuBout");
+    let poignee = reqd_form_value(form_data, "poignee")?.parse::<Poignée>().unwrap();
+    let chelem = reqd_form_value(form_data, "chelem")?.parse::<Chelem>().unwrap();
 
     Ok(CompletedHand {
         table,
