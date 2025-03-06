@@ -7,8 +7,7 @@ cargo install cargo-lambda
 # Development
 
 ```bash
-source ../.env     # `source ../.env.fish` if using fish
-cargo lambda watch --env-file ../.env
+cargo lambda watch --env-file ../local-dev.env
 ```
 
 ```bash

@@ -1,0 +1,204 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'tarot base resources'
+
+Parameters:
+  AppName:
+    Type: String
+    Default: tarot
+    Description: The name of the application
+
+Resources:
+
+  ###
+  ### DynamoDB
+  ###
+
+  GamesTable:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AppName}-games'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: gameId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: gameId
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+
+  HandsTable:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AppName}-hands'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: gameId
+          AttributeType: S
+        - AttributeName: handId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: gameId
+          KeyType: HASH
+        - AttributeName: handId
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+
+  DynamoAccessPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${AppName}-DynamoAccessPolicy'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:BatchGetItem
+              - dynamodb:BatchWriteItem
+              - dynamodb:ConditionCheckItem
+              - dynamodb:DeleteItem
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:UpdateItem
+            Resource:
+              - !GetAtt GamesTable.Arn
+              - !GetAtt HandsTable.Arn
+
+
+  ###
+  ### S3
+  ###
+
+  WebAssetsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AppName}-${AWS::AccountId}-${AWS::Region}-web-assets'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  WebAssetsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebAssetsBucket
+      PolicyDocument:
+        Statement:
+          - Action: s3:GetObject
+            Effect: Allow
+            Resource: !Sub 'arn:${AWS::Partition}:s3:::${WebAssetsBucket}/*'
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringLike:
+                AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/*'
+
+  ###
+  ### Lambda IAM role
+  ###
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AppName}-${AWS::Region}-LambdaExecutionRole'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref DynamoAccessPolicy
+      Policies:
+        - PolicyName: LambdaBasicExecutionPolicy
+          PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AppName}:*'
+
+
+  ###
+  ### Deployer IAM user
+  ###
+
+  DeployerIAMUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Sub '${AppName}-Deployer'
+      Policies:
+        - PolicyName: DeployerPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: cloudformation:ListExports
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub '${WebAssetsBucket.Arn}'
+                  - !Sub '${WebAssetsBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - lambda:Get*
+                  - lambda:CreateFunction
+                  - lambda:UpdateFunctionCode
+                  - lambda:UpdateFunctionConfiguration
+                Resource: !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppName}'
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: !GetAtt LambdaExecutionRole.Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: lambda.amazonaws.com
+
+
+  ###
+  ### Local dev IAM user
+  ###
+
+  LocalDevIAMUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Sub '${AppName}-LocalDev'
+      ManagedPolicyArns:
+        - !Ref DynamoAccessPolicy
+
+
+Outputs:
+  WebAssetsBucket:
+    Export:
+      Name: !Sub '${AppName}-WebAssetsBucket'
+    Value: !Ref WebAssetsBucket
+  WebAssetsBucketRegionalDomainName:
+    Export:
+      Name: !Sub '${AppName}-WebAssetsBucket-RegionalDomainName'
+    Value: !GetAtt WebAssetsBucket.RegionalDomainName
+  LambdaExecutionRoleArn:
+    Export:
+      Name: !Sub '${AppName}-LambdaExecutionRoleArn'
+    Value: !GetAtt LambdaExecutionRole.Arn

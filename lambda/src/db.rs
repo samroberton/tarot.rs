@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use lazy_static::lazy_static;
 
 use aws_sdk_dynamodb::error::SdkError;
 use aws_sdk_dynamodb::operation::{
@@ -9,6 +10,12 @@ use aws_sdk_dynamodb::Client;
 use thiserror::Error;
 
 use crate::game::{Bid, Chelem, CompletedHand, Game, Poignée};
+
+lazy_static! {
+    static ref APP_NAME: String = std::env::var("APP_NAME").unwrap_or("tarot".to_string());
+    static ref TABLE_GAMES: String = format!("{}-games", *APP_NAME);
+    static ref TABLE_HANDS: String = format!("{}-hands", *APP_NAME);
+}
 
 #[derive(Error, Debug)]
 pub enum DbError {
@@ -31,7 +38,7 @@ pub enum DbError {
 pub async fn get_game(client: &Client, game_id: &str) -> Result<Option<Game>, DbError> {
     let result = client
         .get_item()
-        .table_name("tarotgames")
+        .table_name((*TABLE_GAMES).clone())
         .key("gameId", AttributeValue::S(game_id.to_string()))
         .send()
         .await?;
@@ -53,7 +60,7 @@ pub async fn get_game(client: &Client, game_id: &str) -> Result<Option<Game>, Db
 pub async fn put_game(client: &Client, game: &Game) -> Result<(), DbError> {
     client
         .put_item()
-        .table_name("tarotgames")
+        .table_name((*TABLE_GAMES).clone())
         .item("gameId", to_s(&game.game_id))
         .item("date", to_s(&game.date))
         .item("host", to_s(&game.host))
@@ -67,7 +74,7 @@ pub async fn put_game(client: &Client, game: &Game) -> Result<(), DbError> {
 pub async fn get_hands(client: &Client, game_id: &str) -> Result<Vec<CompletedHand>, DbError> {
     let result = client
         .query()
-        .table_name("tarothands")
+        .table_name((*TABLE_HANDS).clone())
         .key_condition_expression("gameId = :gameId")
         .expression_attribute_values(":gameId", AttributeValue::S(game_id.to_string()))
         .scan_index_forward(true)
@@ -124,11 +131,11 @@ pub async fn get_hands(client: &Client, game_id: &str) -> Result<Vec<CompletedHa
 pub async fn put_hand(client: &Client, game_id: &str, hand: &CompletedHand) -> Result<(), DbError> {
     client
         .put_item()
-        .table_name("tarothands")
+        .table_name((*TABLE_HANDS).clone())
         .item("gameId", to_s(&game_id.to_string()))
         .item(
-            "SK",
-            AttributeValue::S(hand.table.clone() + "#" + &hand.hand_number.to_string()),
+            "handId",
+            AttributeValue::S(format!("{}#{}", &hand.hand_number, hand.table)),
         )
         .item("table", to_s(&hand.table))
         .item("handNumber", to_n(hand.hand_number))

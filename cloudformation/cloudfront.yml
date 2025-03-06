@@ -1,40 +1,42 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'tarot-rs CloudFront distribution'
+Description: 'tarot base resources'
+
+Parameters:
+  AppName:
+    Type: String
+    Default: tarot
+    Description: The name of the application
 
 Resources:
-  AssetsBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: tarot-rs-web-assets
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
 
-  AssetsBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref AssetsBucket
-      PolicyDocument:
-        Statement:
-          - Action: s3:GetObject
-            Effect: Allow
-            Resource: !Sub 'arn:${AWS::Partition}:s3:::${AssetsBucket}/*'
-            Principal:
-              Service: cloudfront.amazonaws.com
-            Condition:
-              StringEquals:
-                AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
+  ###
+  ### Lambda URL
+  ###
 
-  CloudFrontOriginAccessControl:
+  LambdaFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppName}'
+      AuthType: NONE
+
+
+  ###
+  ### Origin Access Control
+  ###
+
+  S3CloudFrontOriginAccessControl:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
-        Name: !Sub '${AWS::StackName}-oac'
+        Name: !Sub '${AppName}-s3-oac'
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
+
+
+  ###
+  ### CloudFront distribution
+  ###
 
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
@@ -43,9 +45,10 @@ Resources:
         Enabled: true
         HttpVersion: http2
         Origins:
-          - Id: S3Origin
-            DomainName: !GetAtt AssetsBucket.RegionalDomainName
-            OriginAccessControlId: !GetAtt CloudFrontOriginAccessControl.Id
+          - Id: WebAssetsBucketOrigin
+            DomainName:
+              Fn::ImportValue: !Sub '${AppName}-WebAssetsBucket-RegionalDomainName'
+            OriginAccessControlId: !GetAtt S3CloudFrontOriginAccessControl.Id
             S3OriginConfig:
               OriginAccessIdentity: ''
           - Id: LambdaOrigin
@@ -75,7 +78,7 @@ Resources:
           Compress: true
         CacheBehaviors:
           - PathPattern: assets/*
-            TargetOriginId: S3Origin
+            TargetOriginId: WebAssetsBucketOrigin
             ViewerProtocolPolicy: redirect-to-https
             AllowedMethods:
               - GET
@@ -85,4 +88,4 @@ Resources:
               - GET
               - HEAD
             CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # CachingOptimized
-            OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf # CORS-S3Origin
+            OriginRequestPolicyId: !Ref AWS::NoValue

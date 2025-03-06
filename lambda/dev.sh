@@ -1,1 +1,1 @@
-cargo lambda watch --env-file .env
+cargo lambda watch --env-file local-dev.env
