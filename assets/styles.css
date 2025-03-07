@@ -4,17 +4,24 @@ body {
     font-family: system-ui, -apple-system, sans-serif;
     line-height: 1.5;
     padding: 2rem;
-}
-
-form {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
 }
 
-label {
-    display: block;
-    margin-bottom: 0.5rem;
+button.qrcode {
+    position: absolute;
+    right: 2rem;
+}
+
+dialog img.qrcode {
+    width: 300px;
+    max-width: 75vw;
+}
+
+dialog button.icon.close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
 }
 
 input, select {
@@ -22,7 +29,6 @@ input, select {
     border: 1px solid #ccc;
     border-radius: 4px;
     font-size: 1rem;
-    width: 100%;
     box-sizing: border-box;
 }
 
@@ -31,30 +37,58 @@ select[multiple] {
 }
 
 button {
+    cursor: pointer;
+}
+
+button:not(.icon),
+a[role="button"]:not(.icon) {
     padding: 0.75rem 1.5rem;
     background-color: #0066cc;
     color: white;
     border: none;
     border-radius: 4px;
-    cursor: pointer;
     font-size: 1rem;
 }
 
-button:hover {
+button:not(.icon):hover,
+a[role="button"]:not(.icon):hover {
     background-color: #0052a3;
 }
 
-.checkbox-wrapper {
+button.icon,
+a.icon[role="button"]{
+    background-color: inherit;
+    border: none;
+    padding: 0;
+}
+
+.hand-form {
+    display: grid;
+    grid-template-columns: 10rem 1fr;
+    align-items: baseline;
+    row-gap: 1rem;
+}
+
+.hand-form label {
+    grid-column: 1;
+}
+
+.hand-form input, .hand-form select {
+    grid-column: 2;
+}
+
+.hand-form input[type="checkbox"] {
+    justify-self: start;
+}
+
+table.hands td,
+table.hands th {
+    white-space: nowrap;
+    vertical-align: top;
+}
+
+div.cols {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.checkbox-wrapper input[type="checkbox"] {
-    width: 1.2rem;
-    height: 1.2rem;
-}
-
-.form-group {
-    margin-bottom: 1rem;
+    flex-direction: column;
+    align-items: stretch;
 }
