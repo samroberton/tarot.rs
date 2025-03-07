@@ -45,6 +45,7 @@ async fn lambda_handler(event: Request) -> Result<HttpResponse<Body>, LambdaErro
     let form_data = read_form_data(&event)?;
 
     let response = server::handler::handle(&client, host, method, path, &form_data).await?;
+    print!("Response: {:?}", response);
     Ok(server::responses::render(response)?)
 }
 

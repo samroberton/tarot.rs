@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::{cmp::max, collections::HashMap};
 
 use maud::{html, Markup, DOCTYPE};
-use crate::game::{CompletedHand, Game};
+use crate::{game::{hand_id, Bid, Chelem, CompletedHand, Game, Poignée}, server::routes::{url_for, Route}};
 
 fn layout(content: Markup) -> Markup {
     let script_file = std::env::var("SCRIPT_JS").unwrap_or("script.js".to_string());
@@ -32,18 +32,21 @@ fn player_select(
     id: &str, 
     label_text: &str, 
     multiple: bool,
-    required: bool
+    required: bool,
+    current_values: Vec<&String>
 ) -> Markup {
     html! {
         div class="form-group" {
             label for=(id) { (label_text) }
             select name=(name) id=(id) multiple[multiple] required[required] {
-                option value="" disabled selected hidden { "Selectionner" }
+                @if current_values.is_empty() && required {
+                    option value="" disabled selected hidden { "Selectionner" }
+                }
                 @if !required && !multiple {
                     option value="" { "Aucun" }
                 }
                 @for player in players {
-                    option value=(player) { (player) }
+                    option value=(player) selected[current_values.contains(&player)] { (player) }
                 }
             }
         }
@@ -74,6 +77,128 @@ pub fn html_index() -> Markup {
         }
     })
 }
+
+
+fn select_options<T: PartialEq, ValFn, DisplayFn>(options: Vec<T>, current_value: Option<&T>, val_fn: ValFn, display_fn: DisplayFn) -> Markup
+where
+    ValFn: Fn(&T) -> String,
+    DisplayFn: Fn(&T) -> String
+{
+    html! {
+        @if current_value.is_none() {
+            option value="" disabled selected hidden { "Selectionner" }
+        }
+        @for option in options {
+            option value=(val_fn(&option)) selected[current_value.map(|val| *val == option).unwrap_or(false)] { (display_fn(&option)) };
+        }
+    }
+}
+
+
+pub fn hand_form(game: &Game, hand: Option<&CompletedHand>, next_hand_choices: Vec<(String, i32)>) -> Markup {
+    let form_url = match hand {
+        Some(hand) => format!("/games/{}/hands/{}", game.game_id, hand.hand_id()),
+        None => format!("/games/{}/hands", game.game_id)
+    };
+    
+    html! {
+        form action=(form_url) method="POST" {
+            div class="form-group" {
+                label for="bid" { "Contrat" }
+                select name="handId" id="handId" required {
+                    @if let Some(ref h) = hand {
+                        option value=(h.hand_id()) selected { "Table \"" (h.table) "\" - Partie #" (h.hand_number) }
+                    }
+                    @for (table, hand_number) in next_hand_choices {
+                        option value=(hand_id(hand_number, &table)) { "Table \"" (table) "\" - Partie #" (hand_number) }
+                    }
+                }
+            }
+
+            div class="form-group" {
+                label for="bid" { "Contrat" }
+                select name="bid" id="bid" required {
+                    (select_options(
+                        vec![Bid::Petite, Bid::Garde, Bid::GardeSans, Bid::GardeContre],
+                        hand.map(|h| &h.bid),
+                        |v| v.to_string(),
+                        |v| v.to_string()
+                    ))
+                }
+            }
+
+            (player_select(&game.players, "bidder", "bidder", "Preneur", false, true, hand.map(|h| vec![&h.bidder]).unwrap_or(vec![])))
+            (player_select(&game.players, "partner", "partner", "Appelé", false, false, hand.map(|h| 
+                if let Some(ref partner) = h.partner {
+                    vec![partner]
+                } else {
+                    vec![]
+                }
+            ).unwrap_or(vec![])))
+            (player_select(&game.players, "defence", "defence", "Defense", true, false, hand.map(|h| h.defence.iter().collect()).unwrap_or(vec![])))
+
+            div class="checkbox-wrapper" {
+                input type="checkbox" name="won" id="won" checked[hand.map(|h| h.won).unwrap_or(false)];
+                label for="won" { "Gagnée?" }
+            }
+
+            div class="form-group" {
+                label for="wonOrLostBy" { "Nombre de points gagnés/perdus" }
+                input type="number" 
+                      name="wonOrLostBy" 
+                      id="wonOrLostBy"
+                      min="0"
+                      max="91"
+                      value=(hand.map(|h| h.won_or_lost_by.to_string()).unwrap_or("".to_string()))
+                      required;
+            }
+
+            div class="checkbox-wrapper" {
+                input type="checkbox" name="petitAuBout" id="petitAuBout" checked[hand.map(|h| h.petit_au_bout).unwrap_or(false)];
+                label for="petitAuBout" { "Petit au bout?" }
+            }
+
+            div class="form-group" {
+                label for="poignee" { "Poignée" }
+                select name="poignee" id="poignee" {
+                    (select_options(
+                        vec![Poignée::Aucune, Poignée::Simple, Poignée::Double, Poignée::Triple],
+                        Some(hand.map(|h| &h.poignee).unwrap_or(&Poignée::Aucune)),
+                        |v| v.to_string(),
+                        |v| v.to_string()
+                    ))
+                }
+            }
+
+            div class="form-group" {
+                label for="chelem" { "Chelem" }
+                select name="chelem" id="chelem" {
+                    (select_options(
+                        vec![Chelem::Aucun, Chelem::Annoncé, Chelem::NonAnnoncé],
+                        Some(hand.map(|h| &h.chelem).unwrap_or(&Chelem::Aucun)),
+                        |v| v.to_string(),
+                        |v| v.to_string()
+                    ))
+                }
+            }
+
+            button type="submit" { @if let Some(_) = hand { "Edit Hand" } @else { "Add Hand" } }
+        }
+    }
+}
+
+fn get_next_hand_choices(tables: &Vec<String>, hands: &Vec<&CompletedHand>) -> Vec<(String, i32)> {
+    tables.iter().map(|table| {
+        let mut hand_number = 1;
+        for hand in hands {
+            if hand.table == *table {
+                hand_number = max(hand_number, hand.hand_number + 1);
+            }
+        }
+        (table.clone(), hand_number)
+    }).collect()
+}
+
 
 pub fn html_game(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>, totals: &HashMap<String, i32>) -> Markup {
     layout(html! {
@@ -118,10 +243,13 @@ pub fn html_game(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>
                             th { "Petit au bout?" }
                             th { "Poignée" }
                             th { "Chelem" }
+                            th { "" }
+                            th { "" }
                         }
                     }
                     tbody {
                         @for (hand, _) in hands {
+                            @let route_url = url_for(&Route::GameHand { game_id: game.game_id.clone(), hand_id: hand.hand_id() });
                             tr {
                                 td { (hand.table) }
                                 td { (hand.hand_number) }
@@ -143,6 +271,11 @@ pub fn html_game(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>
                                 td { (if hand.petit_au_bout { "Oui" } else { "Non" }) }
                                 td { (hand.poignee) }
                                 td { (hand.chelem) }
+                                td { a href=(route_url) { "Edit" } }
+                                td { form action=(route_url) method="POST" {
+                                    input type="hidden" name="_method" value="DELETE";
+                                    button type="submit" { "Delete" }
+                                } }
                             }
                         }
                     }
@@ -187,82 +320,16 @@ pub fn html_game(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>
 
         section {
             h2 { "Add Hand" }
-            form action={"/games/" (game.game_id) "/hands"} method="POST" {
-                div class="form-group" {
-                    label for="table" { "Table" }
-                    select name="table" id="table" required {
-                        @for table in &game.tables {
-                            option value=(table) { (table) }
-                        }
-                    }
-                }
-                
-                div class="form-group" {
-                    label for="handNumber" { "Partie #" }
-                    input type="number" 
-                          name="handNumber" 
-                          id="handNumber"
-                          value="1" 
-                          min="1" 
-                          required;
-                }
-
-                div class="form-group" {
-                    label for="bid" { "Contrat" }
-                    select name="bid" id="bid" required {
-                        option value="" disabled selected hidden { "Selectionner" }
-                        option value="petite" { "Petite" }
-                        option value="garde" { "Garde" }
-                        option value="garde sans" { "Garde Sans" }
-                        option value="garde contre" { "Garde Contre" }
-                    }
-                }
-
-                (player_select(&game.players, "bidder", "bidder", "Preneur", false, true))
-                (player_select(&game.players, "partner", "partner", "Appelé", false, false))
-                (player_select(&game.players, "defence", "defence", "Defense", true, false))
-
-                div class="checkbox-wrapper" {
-                    input type="checkbox" name="won" id="won";
-                    label for="won" { "Gagnée?" }
-                }
-
-                div class="form-group" {
-                    label for="wonOrLostBy" { "Nombre de points gagnés/perdus" }
-                    input type="number" 
-                          name="wonOrLostBy" 
-                          id="wonOrLostBy"
-                          min="0"
-                          required;
-                }
-
-                div class="checkbox-wrapper" {
-                    input type="checkbox" name="petitAuBout" id="petitAuBout";
-                    label for="petitAuBout" { "Petit au bout?" }
-                }
-
-                div class="form-group" {
-                    label for="poignee" { "Poignée" }
-                    select name="poignee" id="poignee" {
-                        option value="aucune" { "Aucune" }
-                        option value="simple" { "Simple" }
-                        option value="double" { "Double" }
-                        option value="triple" { "Triple" }
-                    }
-                }
-
-                div class="form-group" {
-                    label for="chelem" { "Chelem" }
-                    select name="chelem" id="chelem" {
-                        option value="aucun" { "Aucun" }
-                        option value="annoncé" { "Annoncé" }
-                        option value="non annoncé" { "Non annoncé" }
-                    }
-                }
-
-                button type="submit" { "Add Hand" }
-            }
+            @let next_hand_choices = get_next_hand_choices(&game.tables, &hands.iter().map(|(h, _)| h).collect());
+            (hand_form(&game, None, next_hand_choices))
         }
+    })
+}
+
+pub fn html_edit_hand(game: &Game, hands: &Vec<CompletedHand>, hand: &CompletedHand) -> Markup {
+    layout(html! {
+        h1 { "Edit Hand" }
+        (hand_form(game, Some(hand), get_next_hand_choices(&game.tables, &hands.iter().collect())))
     })
 }
 

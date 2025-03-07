@@ -1,9 +1,10 @@
+use std::collections::HashMap;
 use std::str::FromStr;
 use lazy_static::lazy_static;
 
 use aws_sdk_dynamodb::error::SdkError;
 use aws_sdk_dynamodb::operation::{
-    get_item::GetItemError, put_item::PutItemError, query::QueryError,
+    get_item::GetItemError, put_item::PutItemError, delete_item::DeleteItemError, query::QueryError,
 };
 use aws_sdk_dynamodb::types::AttributeValue;
 use aws_sdk_dynamodb::Client;
@@ -30,6 +31,9 @@ pub enum DbError {
 
     #[error("GetItem error: {0}")]
     GetItem(#[from] SdkError<GetItemError>),
+
+    #[error("DeleteItem error: {0}")]
+    DeleteItem(#[from] SdkError<DeleteItemError>),
 
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
@@ -71,6 +75,32 @@ pub async fn put_game(client: &Client, game: &Game) -> Result<(), DbError> {
     Ok(())
 }
 
+fn item_to_completed_hand(item: HashMap<String, AttributeValue>) -> Result<CompletedHand, DbError> {
+    Ok(CompletedHand {
+        table: get_s(&item, "table")?,
+        hand_number: get_n(&item, "handNumber")?,
+        players: get_l_of_s(&item, "players")?,
+        bid: Bid::from_str(
+            get_s(&item, "bid")?.as_str(),
+        )
+        .map_err(|e| DbError::Validation(format!("Invalid bid {:?}", e.to_string())))?,
+        bidder: get_s(&item, "bidder")?,
+        partner: get_option_s(&item, "partner")?,
+        defence: get_l_of_s(&item, "defence")?,
+        won: get_bool(&item, "won")?,
+        won_or_lost_by: get_n(&item, "wonOrLostBy")?,
+        petit_au_bout: get_bool(&item, "petitAuBout")?,
+        poignee: Poignée::from_str(
+            get_s(&item, "poignee")?.as_str(),
+        )
+        .map_err(|e| DbError::Validation(format!("Invalid poignee {:?}", e.to_string())))?,
+        chelem: Chelem::from_str(
+            get_s(&item, "chelem")?.as_str(),
+        )
+        .map_err(|e| DbError::Validation(format!("Invalid chelem {:?}", e.to_string())))?,
+    })
+}
+
 pub async fn get_hands(client: &Client, game_id: &str) -> Result<Vec<CompletedHand>, DbError> {
     let result = client
         .query()
@@ -88,41 +118,7 @@ pub async fn get_hands(client: &Client, game_id: &str) -> Result<Vec<CompletedHa
 
     let hands: Result<Vec<CompletedHand>, _> = items
         .into_iter()
-        .map(|item| {
-            Ok(CompletedHand {
-                table: get_s(&item, "table")?,
-                hand_number: get_n(&item, "handNumber")?,
-                players: get_l_of_s(&item, "players")?,
-                bid: Bid::from_str(
-                    get_s(&item, "bid")?.as_str(),
-                )
-                .map_err(|e| DbError::Validation(format!("Invalid bid {:?}", e.to_string())))?,
-                bidder: get_s(&item, "bidder")?,
-                partner: get_option_s(&item, "partner")?,
-                defence: get_l_of_s(&item, "defence")?,
-                won: get_bool(&item, "won")?,
-                won_or_lost_by: item
-                    .get("wonOrLostBy")
-                    .and_then(|av| av.as_n().ok())
-                    .and_then(|n| n.parse().ok())
-                    .ok_or_else(|| {
-                        DbError::Validation("Missing or invalid wonOrLostBy".to_string())
-                    })?,
-                petit_au_bout: get_bool(&item, "petitAuBout")?,
-                poignee: Poignée::from_str(
-                    item.get("poignee")
-                        .and_then(|av| av.as_s().ok())
-                        .ok_or_else(|| DbError::Validation("Missing poignee".to_string()))?,
-                )
-                .unwrap(),
-                chelem: Chelem::from_str(
-                    item.get("chelem")
-                        .and_then(|av| av.as_s().ok())
-                        .ok_or_else(|| DbError::Validation("Missing chelem".to_string()))?,
-                )
-                .unwrap(),
-            })
-        })
+        .map(|item| item_to_completed_hand(item))
         .collect();
 
     hands
@@ -133,10 +129,7 @@ pub async fn put_hand(client: &Client, game_id: &str, hand: &CompletedHand) -> R
         .put_item()
         .table_name((*TABLE_HANDS).clone())
         .item("gameId", to_s(&game_id.to_string()))
-        .item(
-            "handId",
-            AttributeValue::S(format!("{}#{}", &hand.hand_number, hand.table)),
-        )
+        .item("handId", AttributeValue::S(hand.hand_id()))
         .item("table", to_s(&hand.table))
         .item("handNumber", to_n(hand.hand_number))
         .item("players", to_l_of_s(&hand.players))
@@ -155,6 +148,18 @@ pub async fn put_hand(client: &Client, game_id: &str, hand: &CompletedHand) -> R
         .item("petitAuBout", AttributeValue::Bool(hand.petit_au_bout))
         .item("poignee", AttributeValue::S(hand.poignee.to_string()))
         .item("chelem", AttributeValue::S(hand.chelem.to_string()))
+        .send()
+        .await?;
+
+    Ok(())
+}
+
+pub async fn delete_hand(client: &Client, game_id: &str, hand_id: &str) -> Result<(), DbError> {
+    client
+        .delete_item()
+        .table_name((*TABLE_HANDS).clone())
+        .key("gameId", AttributeValue::S(game_id.to_string()))
+        .key("handId", AttributeValue::S(hand_id.to_string()))
         .send()
         .await?;
 

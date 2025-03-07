@@ -1,4 +1,4 @@
-use crate::game::{Bid, Chelem, CompletedHand, Game, Poignée, ValidationError};
+use crate::game::{hand_number_and_table, Bid, Chelem, CompletedHand, Game, Poignée, ValidationError};
 
 fn lines(s: &str) -> Vec<String> {
     s.split('\n')
@@ -49,10 +49,8 @@ pub fn form_data_to_game(game_id: String, form_data: &Vec<(String, String)>) -> 
 }
 
 pub fn form_data_to_hand(form_data: &Vec<(String, String)>) -> Result<CompletedHand, ValidationError> {
-    let table = reqd_form_value(form_data, "table")?.clone();
-    let hand_number = reqd_form_value(form_data, "handNumber")?
-        .parse::<i32>()
-        .unwrap();
+    let hand_id = reqd_form_value(form_data, "handId")?;
+    let (hand_number, table) = hand_number_and_table(hand_id)?;
 
     let bidder = reqd_form_value(form_data, "bidder")?.clone();
     let partner = match form_value(form_data, "partner") {

@@ -7,43 +7,55 @@ use maud::Markup;
 use qrcode::QrCode;
 
 use crate::game::{CompletedHand, Game};
-use crate::html::{html_bad_request, html_game, html_index, html_not_found};
+use crate::html::{html_bad_request, html_edit_hand, html_game, html_index, html_not_found};
 use crate::server::routes::{url_for, Route};
 
+#[derive(Debug)]
 pub enum Response {
     CreateGamePage,
-    RedirectToGame(Game),
-    GamePage(
-        Game,
-        Vec<(CompletedHand, HashMap<String, i32>)>,
-        HashMap<String, i32>,
-    ),
-    GameNotFound(String),
+    RedirectToGame { game: Game },
+    GamePage {
+        game: Game,
+        hands_with_scores: Vec<(CompletedHand, HashMap<String, i32>)>,
+        total_scores: HashMap<String, i32>
+    },
+    GameNotFound { game_id: String },
+    EditHandPage { game: Game, hands: Vec<CompletedHand>, hand: CompletedHand },
+    HandNotFound { game_id: String, hand_id: String },
     NotFound,
-    HttpMethodNotAllowed(Method, String),
-    ValidationError(String),
-    QRCode(String),
+    HttpMethodNotAllowed { method: Method, path: String },
+    ValidationError { msg: String },
+    QRCode { url: String },
 }
 
 pub fn render(response: Response) -> Result<HttpResponse<Body>, HttpError> {
     match response {
         Response::CreateGamePage => http200(html_index()),
-        Response::RedirectToGame(game) => http302(url_for(&Route::Game(game.game_id))),
-        Response::GamePage(game, hands, totals) => http200(html_game(&game, &hands, &totals)),
-        Response::NotFound => http404(html_not_found()),
-        Response::GameNotFound(_game_id) => {
+        Response::RedirectToGame { game } => http302(url_for(&Route::Game { game_id: game.game_id })),
+        Response::GamePage { game, hands_with_scores, total_scores } => {
+            http200(html_game(&game, &hands_with_scores, &total_scores))
+        },
+        Response::GameNotFound { game_id: _ } => {
             // TODO specific response for game not found
             http404(html_not_found())
-        }
-        Response::HttpMethodNotAllowed(_method, _path) => {
+        },
+        Response::EditHandPage { game, hands, hand } => {
+            http200(html_edit_hand(&game, &hands, &hand))
+        },
+        Response::HandNotFound { game_id: _, hand_id: _ } => {
+            // TODO specific response for hand not found
+            http404(html_not_found())
+        },
+        Response::NotFound => http404(html_not_found()),
+        Response::HttpMethodNotAllowed { method: _, path: _ } => {
             // TODO specific response for method not allowed
             http405(html_not_found())
         }
-        Response::ValidationError(msg) => {
+        Response::ValidationError { msg } => {
             // TODO specific response for validation error
             http400(html_bad_request(&msg))
         }
-        Response::QRCode(url) => {
+        Response::QRCode { url } => {
             let code = QrCode::new(url.as_bytes()).unwrap();
             let image = code
                 .render::<Luma<u8>>()

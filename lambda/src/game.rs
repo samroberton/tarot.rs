@@ -109,7 +109,7 @@ impl FromStr for Chelem {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Game {
     pub game_id: String,
     pub date: String,
@@ -118,7 +118,7 @@ pub struct Game {
     pub tables: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompletedHand {
     pub table: String,
     pub hand_number: i32,
@@ -132,4 +132,22 @@ pub struct CompletedHand {
     pub petit_au_bout: bool,
     pub poignee: Poignée,
     pub chelem: Chelem,
+}
+
+pub fn hand_id(hand_number: i32, table: &str) -> String {
+    format!("{}-{}", hand_number, table)
+}
+
+pub fn hand_number_and_table(hand_id: &str) -> Result<(i32, String), ValidationError> {
+    if let Some((hand_number, table)) = hand_id.split_once('-') {
+        Ok((hand_number.parse().map_err(|v| ValidationError { msg: format!("Invalid hand number: {}", v).to_string() })?, table.to_string()))
+    } else {
+        Err(ValidationError { msg: format!("Invalid hand id: {}", hand_id) })
+    }
+}
+
+impl CompletedHand {
+    pub fn hand_id(&self) -> String {
+        hand_id(self.hand_number, &self.table)
+    }
 }
