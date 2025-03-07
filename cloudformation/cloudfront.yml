@@ -20,6 +20,15 @@ Resources:
       AuthType: NONE
 
 
+  LambdaFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AppName
+      Action: 'lambda:InvokeFunctionUrl'
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
+
   ###
   ### Origin Access Control
   ###
@@ -52,7 +61,7 @@ Resources:
             S3OriginConfig:
               OriginAccessIdentity: ''
           - Id: LambdaOrigin
-            DomainName: 5uu77qv7ax4qz2td3l5skpgjaa0tyrlc.lambda-url.ap-southeast-2.on.aws
+            DomainName: !Select [2, !Split ['/', !GetAtt LambdaFunctionUrl.FunctionUrl]]
             CustomOriginConfig:
               HTTPSPort: 443
               OriginProtocolPolicy: https-only
