@@ -1,5 +1,6 @@
 use std::{cmp::max, collections::HashMap};
 
+use http::Method;
 use maud::{html, Markup, DOCTYPE};
 use crate::{game::{hand_id, Bid, Chelem, CompletedHand, Game, Poignée}, server::routes::{url_for, Route}};
 
@@ -60,23 +61,33 @@ fn player_select(
     }
 }
 
-pub fn html_index() -> Markup {
+pub fn html_new_or_edit_game(game: Option<&Game>) -> Markup {
     layout(html! {
         h1 { "Tarot" }
         form action="/games" method="POST" {
             label for="date" { "Date" }
-            input type="date" name="date" id="date" required;
+            input type="date" name="date" id="date" required value=(game.map(|g| g.date.clone()).unwrap_or("".to_string()));
 
             label for="host" { "Chez" }
-            input type="text" name="host" id="date" required;
+            input type="text" name="host" id="date" required value=(game.map(|g| g.host.clone()).unwrap_or("".to_string()));
 
             label for="players" { "Players" }
-            textarea name="players" rows="10" { }
+            textarea name="players" rows="10" {
+                @if let Some(g) = game {
+                    (g.players.join("\n"))
+                }
+             }
 
             label for="tables" { "Tables" }
-            textarea name="tables" row="5" { }
+            textarea name="tables" row="5" {
+                @if let Some(g) = game {
+                    (g.tables.join("\n"))
+                }
+             }
 
-            button type="submit" { "Créer le jeu" }
+            button type="submit" { 
+                @if let Some(_) = game { "Modifier le jeu" } @else { "Créer le jeu" }
+            }
         }
     })
 }
@@ -105,7 +116,7 @@ pub fn hand_form(game: &Game, hand: Option<&CompletedHand>, next_hand_choices: V
     };
     
     html! {
-        form .hand-form action=(form_url) method="POST" {
+        form .hand-form id="hand-form" action=(form_url) method="POST" {
             label for="bid" { "Partie" }
             select name="handId" id="handId" required {
                 @if let Some(ref h) = hand {
@@ -134,7 +145,7 @@ pub fn hand_form(game: &Game, hand: Option<&CompletedHand>, next_hand_choices: V
                     vec![]
                 }
             ).unwrap_or(vec![])))
-            (player_select(&game.players, "defence", "defence", "Defense", true, false, hand.map(|h| h.defence.iter().collect()).unwrap_or(vec![])))
+            (player_select(&game.players, "defence", "defence", "Defense", true, true, hand.map(|h| h.defence.iter().collect()).unwrap_or(vec![])))
 
             label for="won" { "Gagnée?" }
             input type="checkbox" name="won" id="won" checked[hand.map(|h| h.won).unwrap_or(false)];
@@ -144,6 +155,7 @@ pub fn hand_form(game: &Game, hand: Option<&CompletedHand>, next_hand_choices: V
                     name="wonOrLostBy" 
                     id="wonOrLostBy"
                     min="0"
+                    step="1"
                     max="91"
                     value=(hand.map(|h| h.won_or_lost_by.to_string()).unwrap_or("".to_string()))
                     required;
@@ -189,7 +201,7 @@ fn get_next_hand_choices(tables: &Vec<String>, hands: &Vec<&CompletedHand>) -> V
 }
 
 
-pub fn html_game(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>, totals: &HashMap<String, i32>) -> Markup {
+pub fn html_game(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>, total_scores: &HashMap<String, i32>, player_hand_count: &HashMap<String, i32>) -> Markup {
     let qrcode_url = url_for(&Route::GameQRCode { game_id: game.game_id.clone() });
 
     layout(html! {
@@ -223,16 +235,27 @@ pub fn html_game(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>
             }
             button onclick="toggleNavigableSection(event)" data-navigable="add-hand" {
                 img src=(ADD_ICON) alt="Ajoute une partie" width="16" height="16";
-                "Ajoute"
+                "Ajouter"
             }
         }
         
         section data-navigable="summary" {
-            h2 { "Players" }
+            h2 { "Jouers" }
             @if !game.players.is_empty() {
-                ul {
-                    @for player in &game.players {
-                        li { (player) }
+                table .text-center {
+                    thead {
+                        tr {
+                            th { "Jouer" }
+                            th { "# parties" }
+                        }
+                    }
+                    tbody {
+                        @for player in &game.players {
+                            tr { 
+                                td { (player) }
+                                td { (player_hand_count.get(player).map(|i| i.to_string()).unwrap_or("".to_string())) }
+                            }
+                        }
                     }
                 }
             }
@@ -259,7 +282,7 @@ pub fn html_game(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>
         section data-navigable="scores" hidden {
             h2 { "Scores" }
             @if !hands.is_empty() {
-                table {
+                table .text-center {
                     thead {
                         tr {
                             th { "Table" }
@@ -283,7 +306,7 @@ pub fn html_game(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>
                         tr {
                             td colspan="2" { b { "Total" } }
                             @for player in &game.players {
-                                th { (totals.get(player).map(|i| i.to_string()).unwrap_or("".to_string())) }
+                                th { (total_scores.get(player).map(|i| i.to_string()).unwrap_or("".to_string())) }
                             }
                         }
                     }
@@ -301,7 +324,7 @@ pub fn html_game(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>
 
 fn hands_table(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>) -> Markup {
     html! {
-        table .hands {
+        table .hands.text-center {
             thead {
                 tr {
                     th { "Partie" }
@@ -313,15 +336,34 @@ fn hands_table(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>) 
                     }
                     th { "Défense" }
                     th { "Resultat" }
-                    th { "" }
-                    th { "" }
                 }
             }
             tbody {
                 @for (hand, _) in hands {
                     @let route_url = url_for(&Route::GameHand { game_id: game.game_id.clone(), hand_id: hand.hand_id() });
                     tr {
-                        td { (hand.table) ", #" (hand.hand_number) }
+                        td {
+                            div.cols {
+                                span { (hand.table) ", #" (hand.hand_number) }
+                                span {
+                                    a .icon role="button" href=(route_url) { 
+                                        img src=(EDIT_ICON) alt="Edit" width="16" height="16";
+                                    }
+                                    button .icon onclick=(format!("document.getElementById('delete-dialog-{}').showModal();", hand.hand_id())) { 
+                                        img src=(DELETE_ICON) alt="Delete" width="16" height="16";
+                                    }
+                                    
+                                    dialog id=(format!("delete-dialog-{}", hand.hand_id())) {
+                                        p { "Are you sure you want to delete this hand?" }
+                                        form action=(route_url) method="POST" {
+                                            input type="hidden" name="_method" value="DELETE";
+                                            button type="submit" { "Yes, delete" }
+                                            button type="submit" formmethod="dialog" { "No, cancel" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         td { (hand.bid) }
                         td { 
                             (hand.bidder)
@@ -346,24 +388,6 @@ fn hands_table(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>) 
                                 @if hand.chelem != Chelem::Aucun { span { "avec un chelem " (hand.chelem) } }
                             }
                         }
-                        td { 
-                            a .icon role="button" href=(route_url) { 
-                                img src=(EDIT_ICON) alt="Edit" width="16" height="16";
-                            }
-                        }
-                        td {
-                            dialog id=(format!("delete-dialog-{}", hand.hand_id())) {
-                                p { "Are you sure you want to delete this hand?" }
-                                form action=(route_url) method="POST" {
-                                    input type="hidden" name="_method" value="DELETE";
-                                    button type="submit" { "Yes, delete" }
-                                    button type="submit" formmethod="dialog" { "No, cancel" }
-                                } 
-                            }
-                            button .icon onclick=(format!("document.getElementById('delete-dialog-{}').showModal();", hand.hand_id())) { 
-                                img src=(DELETE_ICON) alt="Delete" width="16" height="16";
-                            } 
-                        }
                     }
                 }
             }
@@ -386,10 +410,38 @@ pub fn html_not_found() -> Markup {
     })
 }
 
-pub fn html_bad_request(msg: &str) -> Markup {
+pub fn html_game_not_found(game_id: &str) -> Markup {
     layout(html! {
-        h1 { "Bad request" }
-        p { (msg) }
+        h1 { "Oops!" }
+        h2 { "404 - Not Found" }
+        p { (format!("The requested game ({}) could not be found.", game_id)) }
         a href="/" { "Return to Home" }
+    })
+}
+
+pub fn html_hand_not_found(game_id: &str, hand_id: &str) -> Markup {
+    layout(html! {
+        h1 { "Oops!" }
+        h2 { "404 - Not Found" }
+        p { (format!("The requested hande (gamd_id = {}, hand_id = {}) could not be found.", game_id, hand_id)) }
+        a href="/" { "Return to Home" }
+    })
+}
+
+pub fn html_method_not_allowed(method: &Method, path: &str) -> Markup {
+    layout(html! {
+        h1 { "Oops!" }
+        h2 { "Method Not Allowed" }
+        pre { (method) " " (path) }
+        p { "That's not a thing!"}
+        a href="/" { "Return to Home" }
+    })
+}
+
+pub fn html_validation_error(msg: &str) -> Markup {
+    layout(html! {
+        h1 { "Validation error" }
+        p { (msg) }
+        p { a href="" onclick="window.history.back(); return false;" { "Go back and try again." } }
     })
 }

@@ -39,12 +39,11 @@ pub async fn handle(
             (&Method::GET, Route::Game { game_id }, _) => {
                 if let Some(game) = get_game(client, &game_id).await? {
                     let hands = get_hands(client, &game_id).await?;
-                    match scoring::score_hands(hands) {
-                        Ok((hands_with_scores, total_scores)) =>
-                            Response::GamePage { game, hands_with_scores, total_scores },
+                    match scoring::score_hands(hands.clone()) {
+                        Ok((hands_with_scores, total_scores, player_hand_count)) => {
+                            Response::GamePage { game, hands_with_scores, total_scores, player_hand_count }
+                        },
                         Err(err) => {
-                            // TODO error!
-                            print!("Error scoring hands: {:?}", err);
                             Response::ValidationError { msg: format!("Error scoring hands: {:?}", err) }
                         }
                     }
@@ -56,8 +55,7 @@ pub async fn handle(
             // GET /games/{game_id}/qrcode
             (&Method::GET, Route::GameQRCode { game_id }, _) => {
                 if let Some(game) = get_game(client, &game_id).await? {
-                    // TODO use a Route
-                    Response::QRCode { url: format!("https://{}/games/{}/qrcode", host, game.game_id) }
+                    Response::QRCode { domain_name: host.to_string(), game_id: game.game_id }
                 } else {
                     Response::GameNotFound { game_id }
                 }

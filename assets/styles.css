@@ -1,9 +1,9 @@
 body {
-    max-width: 600px;
-    margin: 0 auto;
+    max-width: max(600px, 100vw);
     font-family: system-ui, -apple-system, sans-serif;
     line-height: 1.5;
-    padding: 2rem;
+    margin: 0 auto;
+    padding: 1rem;
     display: flex;
     flex-direction: column;
 }
@@ -40,6 +40,25 @@ button {
     cursor: pointer;
 }
 
+nav {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+nav button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+nav button:not(.icon),
+nav button:not(.icon):active,
+nav button:not(.icon):hover {
+    background-color: lightblue;
+    color: black;
+}
+
 button:not(.icon),
 a[role="button"]:not(.icon) {
     padding: 0.75rem 1.5rem;
@@ -62,9 +81,13 @@ a.icon[role="button"]{
     padding: 0;
 }
 
+.icon + .icon {
+    margin-inline-start: 1rem;
+}
+
 .hand-form {
     display: grid;
-    grid-template-columns: 10rem 1fr;
+    grid-template-columns: 8rem 1fr;
     align-items: baseline;
     row-gap: 1rem;
 }
@@ -91,4 +114,29 @@ div.cols {
     display: flex;
     flex-direction: column;
     align-items: stretch;
+}
+
+table {
+    width: 100%;
+}
+
+table, th, td {
+    border: 1px solid lightgrey;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 0.5rem;
+}
+
+thead {
+  background-color: lightblue;
+}
+
+tr:nth-child(even) {
+  background-color: lightblue;
+}
+
+.text-center {
+    text-align: center;
 }

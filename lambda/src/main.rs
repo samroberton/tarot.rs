@@ -39,13 +39,21 @@ async fn lambda_handler(event: Request) -> Result<HttpResponse<Body>, LambdaErro
     let config = aws_config::load_from_env().await;
     let client = aws_sdk_dynamodb::Client::new(&config);
 
-    let host = event.headers().get("host").unwrap().to_str().unwrap();
+    let host = if let Some(hv) = event.headers().get("x-forwarded-host") {
+        if let Ok(s) = hv.to_str() {
+            s
+        } else {
+            event.headers().get("host").unwrap().to_str().unwrap()
+        }
+    } else {
+        event.headers().get("host").unwrap().to_str().unwrap()
+    };
+
     let method = event.method();
     let path = event.uri().path();
     let form_data = read_form_data(&event)?;
 
     let response = server::handler::handle(&client, host, method, path, &form_data).await?;
-    print!("Response: {:?}", response);
     Ok(server::responses::render(response)?)
 }
 

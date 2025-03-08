@@ -75,23 +75,25 @@ pub fn score(hand: &CompletedHand) -> Result<HashMap<String, i32>, String> {
     Ok(scores)
 }
 
-pub fn score_hands(hands: Vec<CompletedHand>) -> Result<(Vec<(CompletedHand, HashMap<String, i32>)>, HashMap<String, i32>), String> {
+pub fn score_hands(hands: Vec<CompletedHand>) -> Result<(Vec<(CompletedHand, HashMap<String, i32>)>, HashMap<String, i32>, HashMap<String, i32>), String> {
     let mut hands_with_scores = vec![];
     let mut total_scores = HashMap::new();
+    let mut player_hand_count = HashMap::new();
 
     for hand in hands {
         match score(&hand) {
             Ok(scores) => {
                 hands_with_scores.push((hand, scores.clone()));
                 for (player, score) in scores {
-                    *total_scores.entry(player).or_insert(0) += score;
+                    *total_scores.entry(player.clone()).or_insert(0) += score;
+                    *player_hand_count.entry(player).or_insert(0) += 1;
                 }
             },
             Err(e) => return Err(format!("Error scoring hand: {}", e))
         }
     }
 
-    Ok((hands_with_scores, total_scores))
+    Ok((hands_with_scores, total_scores, player_hand_count))
 }
 
 // let total_scores: HashMap<String, i32> = HashMap::new();

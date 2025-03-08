@@ -23,6 +23,7 @@ STYLES_CSS=$(hash_filename "assets/styles.css")
 
 aws s3 cp --cache-control "public,max-age=31536000,immutable" "assets/script.js" "s3://${s3_bucket}/assets/${SCRIPT_JS}"
 aws s3 cp --cache-control "public,max-age=31536000,immutable" "assets/styles.css" "s3://${s3_bucket}/assets/${STYLES_CSS}"
+aws s3 sync --cache-control "public,max-age=31536000,immutable" "assets/" "s3://${s3_bucket}/assets/" --exclude "script.js" --exclude "styles.css"
 
 
 # Build the Lambda function

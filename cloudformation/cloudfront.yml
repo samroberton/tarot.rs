@@ -85,6 +85,9 @@ Resources:
           CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # CachingDisabled
           OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # AllViewerExceptHostHeader AWS-managed policy
           Compress: true
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt XForwardedHostFunction.FunctionARN
         CacheBehaviors:
           - PathPattern: assets/*
             TargetOriginId: WebAssetsBucketOrigin
@@ -98,3 +101,21 @@ Resources:
               - HEAD
             CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # CachingOptimized
             OriginRequestPolicyId: !Ref AWS::NoValue
+
+  ###
+  ### CloudFront Function to add X-Forwarded-Host header.
+  ###
+
+  XForwardedHostFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub 'x-forwarded-host-${AWS::Region}'
+      AutoPublish: true
+      FunctionConfig:
+        Comment: 'CloudFront function to add X-Forwarded-Host header.'
+        Runtime: cloudfront-js-2.0
+      FunctionCode: >
+        function handler(event) {
+          event.request.headers['x-forwarded-host'] = { value: event.request.headers['host'].value };
+          return event.request;
+        }
