@@ -6,7 +6,9 @@ set -o nounset
 
 deployed_app_name="tarot"
 
-source deployer.env
+if [ -f deployer.env ]; then
+    source deployer.env
+fi
 
 # Deploy assets with hashed filenames
 s3_bucket=$(aws cloudformation list-exports --query "Exports[?Name=='${deployed_app_name}-WebAssetsBucket'].Value" --output text)
