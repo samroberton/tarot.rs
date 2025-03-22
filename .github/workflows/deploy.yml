@@ -1,0 +1,31 @@
+name: Deploy Lambda Function
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # Required for OIDC
+  contents: read    # Required to checkout the repository
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::783764597106:role/GitHubActionsRole
+          aws-region: ap-southeast-2
+
+      - name: Test
+        run: (cd lambda && cargo test)
+
+      - name: Run deploy script
+        run: ./deploy.sh
