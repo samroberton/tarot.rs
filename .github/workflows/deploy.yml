@@ -21,6 +21,9 @@ jobs:
       - name: Test
         run: (cd lambda && cargo test)
 
+      - name: Install Zig
+        run: pip3 install ziglang
+
       - name: Install Cargo Lambda
         run: (cd lambda && cargo install cargo-lambda --locked --force)
 
