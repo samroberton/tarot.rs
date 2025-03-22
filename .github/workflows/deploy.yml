@@ -21,6 +21,9 @@ jobs:
       - name: Test
         run: (cd lambda && cargo test)
 
+      - name: Install Cargo Lambda
+        run: cargo install cargo-lambda
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
