@@ -18,14 +18,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Test
+        run: (cd lambda && cargo test)
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::783764597106:role/GitHubActionsRole
+          role-to-assume: arn:aws:iam::783764597106:role/tarot-GitHubActions
           aws-region: ap-southeast-2
-
-      - name: Test
-        run: (cd lambda && cargo test)
 
       - name: Run deploy script
         run: ./deploy.sh
