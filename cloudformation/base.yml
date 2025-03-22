@@ -138,6 +138,44 @@ Resources:
 
 
   ###
+  ### Deployer IAM Policy
+  ###
+
+  DeployerIAMPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${AppName}-DeployerPolicy'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: cloudformation:ListExports
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !Sub '${WebAssetsBucket.Arn}'
+              - !Sub '${WebAssetsBucket.Arn}/*'
+          - Effect: Allow
+            Action:
+              - lambda:Get*
+              - lambda:CreateFunction
+              - lambda:UpdateFunctionCode
+              - lambda:UpdateFunctionConfiguration
+            Resource: !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppName}'
+          - Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource: !GetAtt LambdaExecutionRole.Arn
+            Condition:
+              StringEquals:
+                iam:PassedToService: lambda.amazonaws.com
+
+
+  ###
   ### Deployer IAM user
   ###
 
@@ -145,36 +183,44 @@ Resources:
     Type: AWS::IAM::User
     Properties:
       UserName: !Sub '${AppName}-Deployer'
-      Policies:
-        - PolicyName: DeployerPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action: cloudformation:ListExports
-                Resource: '*'
-              - Effect: Allow
-                Action:
-                  - s3:PutObject
-                  - s3:GetObject
-                  - s3:ListBucket
-                Resource:
-                  - !Sub '${WebAssetsBucket.Arn}'
-                  - !Sub '${WebAssetsBucket.Arn}/*'
-              - Effect: Allow
-                Action:
-                  - lambda:Get*
-                  - lambda:CreateFunction
-                  - lambda:UpdateFunctionCode
-                  - lambda:UpdateFunctionConfiguration
-                Resource: !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppName}'
-              - Effect: Allow
-                Action:
-                  - iam:PassRole
-                Resource: !GetAtt LambdaExecutionRole.Arn
-                Condition:
-                  StringEquals:
-                    iam:PassedToService: lambda.amazonaws.com
+      ManagedPolicyArns:
+        - !Ref DeployerIAMPolicy
+
+
+  ###
+  ### GitHub Actions OIDC Provider
+  ###
+
+  GitHubActionsOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+
+
+  ###
+  ### GitHub Actions Role
+  ###
+
+  GitHubActionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AppName}-GitHubActions'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !GetAtt GitHubActionsOIDCProvider.Arn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringLike:
+                token.actions.githubusercontent.com:sub: 'repo:samroberton/tarot.rs:*'
+      ManagedPolicyArns:
+        - !Ref DeployerIAMPolicy
 
 
   ###

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'tarot base resources'
+Description: 'tarot CloudFront resources'
 
 Parameters:
   AppName:
