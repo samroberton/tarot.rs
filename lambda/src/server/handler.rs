@@ -9,7 +9,7 @@ use crate::server::responses::Response;
 use crate::server::routes::{match_route, Route};
 
 fn is_delete(form_data: &Vec<(String, String)>) -> bool {
-    form_data.iter().any(|(k, _)| k == "_method" && form_data.iter().any(|(_, v)| v == "DELETE"))
+    form_data.iter().any(|(k, v)| k == "_method" && v == "DELETE")
 }
 
 pub async fn handle(
