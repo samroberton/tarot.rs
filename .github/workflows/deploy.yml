@@ -45,7 +45,7 @@ jobs:
         run: pip3 install ziglang
 
       - name: Install Cargo Lambda
-        run: (cd lambda && cargo install cargo-lambda --locked --force)
+        run: (cd lambda && cargo install cargo-lambda --locked)
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
