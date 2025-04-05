@@ -41,6 +41,16 @@ function validateDefence() {
   }
 }
 
+function updateWonText() {
+  const bidder = document.getElementById('bidder').value;
+  if (bidder) {
+    document.getElementById('won-true').innerText = `Oui, ${bidder} a gagné(e) le contrat`;
+    document.getElementById('won-false').innerText = `Non, ${bidder} a chuté(e) le contrat`;
+  }
+}
+
+document.getElementById('bidder')?.addEventListener('input', () => updateWonText());
+
 document.getElementById('bidder')?.addEventListener('input', () => trimDefence());
 document.getElementById('partner')?.addEventListener('input', () => trimDefence());
 

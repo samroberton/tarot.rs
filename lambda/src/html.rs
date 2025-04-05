@@ -147,10 +147,19 @@ pub fn hand_form(game: &Game, hand: Option<&CompletedHand>, next_hand_choices: V
             ).unwrap_or(vec![])))
             (player_select(&game.players, "defence", "defence", "Defense", true, true, hand.map(|h| h.defence.iter().collect()).unwrap_or(vec![])))
 
-            label for="won" { "Gagnée?" }
-            input type="checkbox" name="won" id="won" checked[hand.map(|h| h.won).unwrap_or(false)];
+            label for="won" { "Gagné?" }
+            select name="won" id="won" {
+                @if let Some(ref h) = hand {
+                    option id="won-true" value="true" selected[h.won] { "Oui, " (h.bidder) " a gagné(e) le contrat" }
+                    option id="won-false" value="false" selected[!h.won] { "Non, " (h.bidder) " a chuté(e) le contrat" }
+                } @else {
+                    option value="" disabled selected hidden { "Sélectionner" }
+                    option id="won-true" value="true" { "Oui, le preneur a gagné(e) le contrat" }
+                    option id="won-false" value="false" { "Non, le preneur a chuté(e) le contrat" }
+                }
+            }
 
-            label for="wonOrLostBy" { "Nombre de points gagnés/perdus" }
+            label for="wonOrLostBy" { "Points de gain/perte" }
             input type="number" 
                     name="wonOrLostBy" 
                     id="wonOrLostBy"

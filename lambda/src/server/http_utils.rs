@@ -15,7 +15,10 @@ fn form_value<'a>(form_data: &'a Vec<(String, String)>, key: &'a str) -> Option<
 }
 
 fn bool_form_value(form_data: &Vec<(String, String)>, key: &str) -> bool {
-    form_value(form_data, key).map(|s| s.to_lowercase() == "on").unwrap_or(false)
+    form_value(form_data, key).map(|s| {
+        let s = s.to_lowercase();
+        s == "on" || s == "true"
+    }).unwrap_or(false)
 }
 
 fn form_values<'a>(form_data: &'a Vec<(String, String)>, key: &str) -> Vec<&'a String> {
