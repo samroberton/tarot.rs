@@ -81,8 +81,14 @@ pub async fn handle(
                 if let Some(game) = get_game(client, &game_id).await? {
                     match http_utils::form_data_to_hand(form_data) {
                         Ok(hand) => {
-                            put_hand(&client, &game_id, &hand).await?;
-                            Response::RedirectToGame { game }
+                            // Make sure the hand is valid before saving it
+                            match scoring::score(&hand) {   
+                                Ok(_scores) => {
+                                    put_hand(&client, &game_id, &hand).await?;
+                                    Response::RedirectToGame { game }
+                                },
+                                Err(e) => Response::ValidationError { msg: e.to_string() },
+                            }
                         },
                         Err(e) => Response::ValidationError { msg: e.to_string() },
                     }
@@ -121,12 +127,18 @@ pub async fn handle(
                 if let Some(game) = get_game(client, &game_id).await? {
                     match http_utils::form_data_to_hand(form_data) {
                         Ok(hand) => {
-                            // if hand_id is being changed, and if so, delete the old hand
-                            if hand.hand_id() != hand_id {
-                                delete_hand(client, &game_id, &hand_id).await?;
+                            // Make sure the hand is valid before saving it
+                            match scoring::score(&hand) {   
+                                Ok(_scores) => {
+                                    // if hand_id is being changed, and if so, delete the old hand
+                                    if hand.hand_id() != hand_id {
+                                        delete_hand(client, &game_id, &hand_id).await?;
+                                    }
+                                    put_hand(&client, &game_id, &hand).await?;
+                                    Response::RedirectToGame { game }
+                                },
+                                Err(e) => Response::ValidationError { msg: e.to_string() },
                             }
-                            put_hand(&client, &game_id, &hand).await?;
-                            Response::RedirectToGame { game }
                         },
                         Err(e) => Response::ValidationError { msg: e.to_string() },
                     }
