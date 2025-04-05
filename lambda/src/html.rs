@@ -48,8 +48,8 @@ fn player_select(
     html! {
         label for=(id) { (label_text) }
         select name=(name) id=(id) multiple[multiple] required[required] {
-            @if current_values.is_empty() && required {
-                option value="" disabled selected hidden { "Selectionner" }
+            @if current_values.is_empty() && required && !multiple {
+                option value="" disabled selected hidden { "Sélectionner" }
             }
             @if !required && !multiple {
                 option value="" { "Aucun" }
