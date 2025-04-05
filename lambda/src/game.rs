@@ -135,7 +135,7 @@ pub struct CompletedHand {
 }
 
 pub fn hand_id(hand_number: i32, table: &str) -> String {
-    format!("{}-{}", hand_number, table)
+    format!("{:02}-{}", hand_number, table)
 }
 
 pub fn hand_number_and_table(hand_id: &str) -> Result<(i32, String), ValidationError> {
