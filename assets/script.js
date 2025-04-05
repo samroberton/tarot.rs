@@ -33,7 +33,7 @@ function validateDefence() {
   const defenceSelect = document.getElementById('defence');
   const playerCount = countSelectedOptions(defenceSelect.selectedOptions) + (!!partner ? 2 : 1);
   if (playerCount < 4 || playerCount > 5) {
-    defenceSelect.setCustomValidity('S\'il vous plait selectionner la défense pour avoir 4 ou 5 jouers en total');
+    defenceSelect.setCustomValidity('S\'il vous plait selectionner la défense pour avoir 4 ou 5 joueurs en total');
     console.log(`Invalid - ${playerCount} players, with defence: ${defenceSelect.selectedOptions}`);
   } else {
     defenceSelect.setCustomValidity('');

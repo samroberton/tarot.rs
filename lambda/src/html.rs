@@ -240,12 +240,12 @@ pub fn html_game(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>
         }
         
         section data-navigable="summary" {
-            h2 { "Jouers" }
+            h2 { "Joueurs" }
             @if !game.players.is_empty() {
                 table .text-center {
                     thead {
                         tr {
-                            th { "Jouer" }
+                            th { "Joueur" }
                             th { "# parties" }
                         }
                     }
