@@ -150,12 +150,12 @@ pub fn hand_form(game: &Game, hand: Option<&CompletedHand>, next_hand_choices: V
             label for="won" { "Gagné?" }
             select name="won" id="won" {
                 @if let Some(ref h) = hand {
-                    option id="won-true" value="true" selected[h.won] { "Oui, " (h.bidder) " a gagné(e) le contrat" }
-                    option id="won-false" value="false" selected[!h.won] { "Non, " (h.bidder) " a chuté(e) le contrat" }
+                    option id="won-true" value="true" selected[h.won] { "Oui, " (h.bidder) " a gagné le contrat" }
+                    option id="won-false" value="false" selected[!h.won] { "Non, " (h.bidder) " a perdu le contrat" }
                 } @else {
                     option value="" disabled selected hidden { "Sélectionner" }
-                    option id="won-true" value="true" { "Oui, le preneur a gagné(e) le contrat" }
-                    option id="won-false" value="false" { "Non, le preneur a chuté(e) le contrat" }
+                    option id="won-true" value="true" { "Oui, le preneur a gagné le contrat" }
+                    option id="won-false" value="false" { "Non, le preneur a perdu le contrat" }
                 }
             }
 
@@ -192,7 +192,7 @@ pub fn hand_form(game: &Game, hand: Option<&CompletedHand>, next_hand_choices: V
                 ))
             }
 
-            button type="submit" { @if let Some(_) = hand { "Edit Hand" } @else { "Add Hand" } }
+            button type="submit" { @if let Some(_) = hand { "Modifier" } @else { "Ajouter" } }
         }
     }
 }
