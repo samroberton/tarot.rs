@@ -77,6 +77,7 @@ pub async fn put_game(client: &Client, game: &Game) -> Result<(), DbError> {
 
 fn item_to_completed_hand(item: HashMap<String, AttributeValue>) -> Result<CompletedHand, DbError> {
     Ok(CompletedHand {
+        hand_id: get_s(&item, "handId")?,
         table: get_s(&item, "table")?,
         hand_number: get_n(&item, "handNumber")?,
         players: get_l_of_s(&item, "players")?,
@@ -110,12 +111,18 @@ pub async fn get_hands(client: &Client, game_id: &str) -> Result<Vec<CompletedHa
         None => return Ok(vec![]),
     };
 
-    let hands: Result<Vec<CompletedHand>, _> = items
+    let mut hands: Vec<CompletedHand> = items
         .into_iter()
         .map(|item| item_to_completed_hand(item))
-        .collect();
+        .collect::<Result<Vec<CompletedHand>, _>>()?;
 
-    hands
+    hands.sort_by(|a, b| {
+        a.hand_number
+            .cmp(&b.hand_number)
+            .then(a.table.cmp(&b.table))
+    });
+
+    Ok(hands)
 }
 
 pub async fn put_hand(client: &Client, game_id: &str, hand: &CompletedHand) -> Result<(), DbError> {
@@ -123,7 +130,7 @@ pub async fn put_hand(client: &Client, game_id: &str, hand: &CompletedHand) -> R
         .put_item()
         .table_name((*TABLE_HANDS).clone())
         .item("gameId", to_s(&game_id.to_string()))
-        .item("handId", AttributeValue::S(hand.hand_id()))
+        .item("handId", to_s(&hand.hand_id))
         .item("table", to_s(&hand.table))
         .item("handNumber", to_n(hand.hand_number))
         .item("players", to_l_of_s(&hand.players))

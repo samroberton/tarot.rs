@@ -115,6 +115,8 @@ pub fn score_hands(hands: Vec<CompletedHand>) -> Result<(Vec<(CompletedHand, Has
 
 #[cfg(test)]
 mod tests {
+    use uuid::Uuid;
+
     use super::*;
 
     fn create_test_players() -> Vec<String> {
@@ -136,6 +138,7 @@ mod tests {
     fn test_four_player_hand_won() {
         let players = create_test_players();
         let hand = CompletedHand {
+            hand_id: Uuid::new_v4().to_string(),
             table: "Atout".to_string(),
             hand_number: 1,
             players: players.clone(),
@@ -163,6 +166,7 @@ mod tests {
     fn test_five_player_hand_with_partner_won() {
         let players = create_test_players_five();
         let hand = CompletedHand {
+            hand_id: Uuid::new_v4().to_string(),
             table: "Atout".to_string(),
             hand_number: 1,
             players,
@@ -191,6 +195,7 @@ mod tests {
     fn test_five_player_hand_bidder_alone_lost() {
         let players = create_test_players_five();
         let hand = CompletedHand {
+            hand_id: Uuid::new_v4().to_string(),
             table: "Atout".to_string(),
             hand_number: 1,
             players,
@@ -219,6 +224,7 @@ mod tests {
     fn test_chelem_and_poignee_scoring() {
         let players = create_test_players();
         let hand = CompletedHand {
+            hand_id: Uuid::new_v4().to_string(),
             table: "Atout".to_string(),
             hand_number: 1,
             players: players.clone(),
@@ -246,6 +252,7 @@ mod tests {
     fn test_invalid_hand_configuration() {
         let players = vec!["Alice".to_string(), "Bob".to_string(), "Charlie".to_string()]; // Only 3 players
         let hand = CompletedHand {
+            hand_id: Uuid::new_v4().to_string(),
             table: "Atout".to_string(),
             hand_number: 1,
             players,

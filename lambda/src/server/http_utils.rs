@@ -1,4 +1,4 @@
-use crate::game::{hand_number_and_table, Bid, Chelem, CompletedHand, Game, PetitAuBout, Poignée, ValidationError};
+use crate::game::{Bid, Chelem, CompletedHand, Game, PetitAuBout, Poignée, ValidationError};
 
 fn lines(s: &str) -> Vec<String> {
     s.split('\n')
@@ -51,11 +51,12 @@ pub fn form_data_to_game(game_id: String, form_data: &Vec<(String, String)>) -> 
     })
 }
 
-pub fn form_data_to_hand(form_data: &Vec<(String, String)>) -> Result<CompletedHand, ValidationError> {
-    let hand_id = reqd_form_value(form_data, "handId")?;
-    let (hand_number, table) = hand_number_and_table(hand_id)?;
-
+pub fn form_data_to_hand(form_data: &Vec<(String, String)>, hand_id: String) -> Result<CompletedHand, ValidationError> {
     let bidder = reqd_form_value(form_data, "bidder")?.clone();
+    let table = reqd_form_value(form_data, "table")?.clone();
+    let hand_number = reqd_form_value(form_data, "handNumber")?
+        .parse::<i32>()
+        .map_err(|v| ValidationError { msg: format!("Invalid hand number: {}", v) })?;
     let partner = match form_value(form_data, "partner") {
         None => None,
         Some(s) if s.is_empty() => None,
@@ -83,6 +84,7 @@ pub fn form_data_to_hand(form_data: &Vec<(String, String)>) -> Result<CompletedH
     let chelem = reqd_form_value(form_data, "chelem")?.parse::<Chelem>().unwrap();
 
     Ok(CompletedHand {
+        hand_id,
         table,
         hand_number,
         players,

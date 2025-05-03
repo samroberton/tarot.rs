@@ -149,6 +149,7 @@ pub struct Game {
 
 #[derive(Debug, Clone)]
 pub struct CompletedHand {
+    pub hand_id: String,
     pub table: String,
     pub hand_number: i32,
     pub players: Vec<String>,
@@ -161,22 +162,4 @@ pub struct CompletedHand {
     pub petit_au_bout: PetitAuBout,
     pub poignee: Poignée,
     pub chelem: Chelem,
-}
-
-pub fn hand_id(hand_number: i32, table: &str) -> String {
-    format!("{:02}-{}", hand_number, table)
-}
-
-pub fn hand_number_and_table(hand_id: &str) -> Result<(i32, String), ValidationError> {
-    if let Some((hand_number, table)) = hand_id.split_once('-') {
-        Ok((hand_number.parse().map_err(|v| ValidationError { msg: format!("Invalid hand number: {}", v).to_string() })?, table.to_string()))
-    } else {
-        Err(ValidationError { msg: format!("Invalid hand id: {}", hand_id) })
-    }
-}
-
-impl CompletedHand {
-    pub fn hand_id(&self) -> String {
-        hand_id(self.hand_number, &self.table)
-    }
 }

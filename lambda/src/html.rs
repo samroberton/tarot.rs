@@ -2,7 +2,7 @@ use std::{cmp::max, collections::HashMap};
 
 use http::Method;
 use maud::{html, Markup, DOCTYPE};
-use crate::{game::{hand_id, Bid, Chelem, CompletedHand, Game, PetitAuBout, Poignée}, server::routes::{url_for, Route}};
+use crate::{game::{Bid, Chelem, CompletedHand, Game, PetitAuBout, Poignée}, server::routes::{url_for, Route}};
 
 const ADD_ICON: &str = "/assets/add_24dp_1F1F1F_FILL0_wght400_GRAD0_opsz24.svg";
 const CLOSE_ICON: &str = "/assets/close_24dp_1F1F1F_FILL0_wght400_GRAD0_opsz24.svg";
@@ -111,21 +111,25 @@ where
 
 pub fn hand_form(game: &Game, hand: Option<&CompletedHand>, next_hand_choices: Vec<(String, i32)>) -> Markup {
     let form_url = match hand {
-        Some(hand) => format!("/games/{}/hands/{}", game.game_id, hand.hand_id()),
+        Some(hand) => format!("/games/{}/hands/{}", game.game_id, hand.hand_id),
         None => format!("/games/{}/hands", game.game_id)
     };
     
     html! {
         form .hand-form id="hand-form" action=(form_url) method="POST" {
-            label for="bid" { "Partie" }
-            select name="handId" id="handId" required {
-                @if let Some(ref h) = hand {
-                    option value=(h.hand_id()) selected { "Table \"" (h.table) "\" - Partie #" (h.hand_number) }
-                }
+            label for="table" { "Table" }
+            select name="table" id="table" required {
                 @for (table, hand_number) in next_hand_choices {
-                    option value=(hand_id(hand_number, &table)) { "Table \"" (table) "\" - Partie #" (hand_number) }
+                    @if hand.is_some_and(|h| h.table == table) {
+                        option value=(table) selected data-next-hand-number=(hand_number) { (table) }
+                    } @else {
+                        option value=(table) data-next-hand-number=(hand_number) { (table) }
+                    }
                 }
             }
+
+            label for="handNumber" { "Partie" }
+            input type="number" name="handNumber" id="handNumber" required value=(hand.map(|h| h.hand_number.to_string()).unwrap_or("".to_string()))
 
             label for="bid" { "Contrat" }
             select name="bid" id="bid" required {
@@ -356,7 +360,7 @@ fn hands_table(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>) 
             }
             tbody {
                 @for (hand, _) in hands {
-                    @let route_url = url_for(&Route::GameHand { game_id: game.game_id.clone(), hand_id: hand.hand_id() });
+                    @let route_url = url_for(&Route::GameHand { game_id: game.game_id.clone(), hand_id: hand.hand_id.clone() });
                     tr {
                         td {
                             div.cols {
@@ -365,11 +369,11 @@ fn hands_table(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>) 
                                     a .icon role="button" href=(route_url) { 
                                         img src=(EDIT_ICON) alt="Edit" width="16" height="16";
                                     }
-                                    button .icon onclick=(format!("document.getElementById('delete-dialog-{}').showModal();", hand.hand_id())) { 
+                                    button .icon onclick=(format!("document.getElementById('delete-dialog-{}').showModal();", hand.hand_id.clone())) { 
                                         img src=(DELETE_ICON) alt="Delete" width="16" height="16";
                                     }
                                     
-                                    dialog id=(format!("delete-dialog-{}", hand.hand_id())) {
+                                    dialog id=(format!("delete-dialog-{}", hand.hand_id.clone())) {
                                         p { "Are you sure you want to delete this hand?" }
                                         form action=(route_url) method="POST" {
                                             input type="hidden" name="_method" value="DELETE";

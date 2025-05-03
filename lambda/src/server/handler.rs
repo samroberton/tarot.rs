@@ -79,7 +79,8 @@ pub async fn handle(
             // POST /games/{game_id}/hands
             (&Method::POST, Route::GameHands { game_id }, Some(form_data)) => {
                 if let Some(game) = get_game(client, &game_id).await? {
-                    match http_utils::form_data_to_hand(form_data) {
+                    let hand_id = Uuid::new_v4().to_string();
+                    match http_utils::form_data_to_hand(form_data, hand_id) {
                         Ok(hand) => {
                             // Make sure the hand is valid before saving it
                             match scoring::score(&hand) {   
@@ -101,7 +102,7 @@ pub async fn handle(
             (&Method::GET, Route::GameHand { game_id, hand_id }, _) => {
                 if let Some(game) = get_game(client, &game_id).await? {
                     let hands = get_hands(client, &game_id).await?;
-                    let hand = hands.iter().find(|h| h.hand_id() == hand_id).cloned();
+                    let hand = hands.iter().find(|h| h.hand_id == hand_id).cloned();
                     if let Some(hand) = hand {
                         Response::EditHandPage { game, hands: hands, hand }
                     } else {
@@ -125,15 +126,11 @@ pub async fn handle(
             // POST /games/{game_id}/hands/{hand_id}
             (&Method::POST, Route::GameHand { game_id, hand_id }, Some(form_data)) => {
                 if let Some(game) = get_game(client, &game_id).await? {
-                    match http_utils::form_data_to_hand(form_data) {
+                    match http_utils::form_data_to_hand(form_data, hand_id) {
                         Ok(hand) => {
                             // Make sure the hand is valid before saving it
                             match scoring::score(&hand) {   
                                 Ok(_scores) => {
-                                    // if hand_id is being changed, and if so, delete the old hand
-                                    if hand.hand_id() != hand_id {
-                                        delete_hand(client, &game_id, &hand_id).await?;
-                                    }
                                     put_hand(&client, &game_id, &hand).await?;
                                     Response::RedirectToGame { game }
                                 },
