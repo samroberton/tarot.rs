@@ -7,7 +7,7 @@ cargo install cargo-lambda
 # Development
 
 ```bash
-cargo lambda watch --env-file ../local-dev.env
+AWS_PROFILE=<profile> cargo lambda watch
 ```
 
 ```bash
