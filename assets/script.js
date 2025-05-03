@@ -1,5 +1,9 @@
 function toggleNavigableSection(event) {
-  const selectedSection = event.target.getAttribute('data-navigable');
+  const selectedSection = event.target.closest('button')?.getAttribute('data-navigable');
+  if (!selectedSection) {
+    console.error('No data-navigable attribute found on button', { target: event.target, button: event.target.closest('button')});
+    return;
+  }
   document.querySelectorAll(`section[data-navigable]`).forEach((section) => {
     section.hidden = section.getAttribute('data-navigable') !== selectedSection;
   });
@@ -29,15 +33,21 @@ function countSelectedOptions(selectedOptions) {
 
 function validateDefence() {
   const partner = document.getElementById('partner').value;
-  console.log(`partner: '${partner}', !!partner ${!!partner}`);
   const defenceSelect = document.getElementById('defence');
-  const playerCount = countSelectedOptions(defenceSelect.selectedOptions) + (!!partner ? 2 : 1);
-  if (playerCount < 4 || playerCount > 5) {
-    defenceSelect.setCustomValidity('S\'il vous plait selectionner la défense pour avoir 4 ou 5 joueurs en total');
-    console.log(`Invalid - ${playerCount} players, with defence: ${defenceSelect.selectedOptions}`);
+  const defenceCount = countSelectedOptions(defenceSelect.selectedOptions);
+
+  if (partner) {
+    if (defenceCount == 3) {
+      defenceSelect.setCustomValidity('');
+    } else {
+      defenceSelect.setCustomValidity('Sélectionner 3 joueurs pour la défense');
+    }
   } else {
-    defenceSelect.setCustomValidity('');
-    console.log(`Valid - ${playerCount} players, with defence: ${defenceSelect.selectedOptions}`);
+    if (defenceCount == 3 || defenceCount == 4) {
+      defenceSelect.setCustomValidity('');
+    } else {
+      defenceSelect.setCustomValidity('Sélectionner 3 ou 4 joueurs pour la défense pour avoir 4 ou 5 joueurs en total');
+    }
   }
 }
 
