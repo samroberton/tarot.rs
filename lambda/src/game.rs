@@ -45,6 +45,35 @@ impl FromStr for Bid {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum PetitAuBout {
+    No,
+    YesForTheBidder,
+    YesForTheDefence,
+}
+
+impl fmt::Display for PetitAuBout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PetitAuBout::No => write!(f, "non"),
+            PetitAuBout::YesForTheBidder => write!(f, "oui, pour le preneur"),
+            PetitAuBout::YesForTheDefence => write!(f, "oui, pour la défense"),
+        }
+    }
+}
+
+impl FromStr for PetitAuBout {
+    type Err = ValidationError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "non" => Ok(PetitAuBout::No),
+            "oui, pour le preneur" => Ok(PetitAuBout::YesForTheBidder),
+            "oui, pour la défense" => Ok(PetitAuBout::YesForTheDefence),
+            _ => Err(ValidationError { msg: s.to_string() }),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Poignée {
@@ -129,7 +158,7 @@ pub struct CompletedHand {
     pub defence: Vec<String>,
     pub won: bool,
     pub won_or_lost_by: i32,
-    pub petit_au_bout: bool,
+    pub petit_au_bout: PetitAuBout,
     pub poignee: Poignée,
     pub chelem: Chelem,
 }

@@ -2,7 +2,7 @@ use std::{cmp::max, collections::HashMap};
 
 use http::Method;
 use maud::{html, Markup, DOCTYPE};
-use crate::{game::{hand_id, Bid, Chelem, CompletedHand, Game, Poignée}, server::routes::{url_for, Route}};
+use crate::{game::{hand_id, Bid, Chelem, CompletedHand, Game, PetitAuBout, Poignée}, server::routes::{url_for, Route}};
 
 const ADD_ICON: &str = "/assets/add_24dp_1F1F1F_FILL0_wght400_GRAD0_opsz24.svg";
 const CLOSE_ICON: &str = "/assets/close_24dp_1F1F1F_FILL0_wght400_GRAD0_opsz24.svg";
@@ -100,7 +100,7 @@ where
 {
     html! {
         @if current_value.is_none() {
-            option value="" disabled selected hidden { "Selectionner" }
+            option value="" disabled selected hidden { "Sélectionner" }
         }
         @for option in options {
             option value=(val_fn(&option)) selected[current_value.map(|val| *val == option).unwrap_or(false)] { (display_fn(&option)) };
@@ -170,7 +170,14 @@ pub fn hand_form(game: &Game, hand: Option<&CompletedHand>, next_hand_choices: V
                     required;
 
             label for="petitAuBout" { "Petit au bout?" }
-            input type="checkbox" name="petitAuBout" id="petitAuBout" checked[hand.map(|h| h.petit_au_bout).unwrap_or(false)];
+            select name="petitAuBout" id="petitAuBout" {
+                (select_options(
+                    vec![PetitAuBout::No, PetitAuBout::YesForTheBidder, PetitAuBout::YesForTheDefence],
+                    hand.map(|h| &h.petit_au_bout),
+                    |v| v.to_string(),
+                    |v| v.to_string()
+                ))
+            }
 
             label for="poignee" { "Poignée" }
             select name="poignee" id="poignee" {
@@ -392,7 +399,11 @@ fn hands_table(game: &Game, hands: &Vec<(CompletedHand, HashMap<String, i32>)>) 
                         td {
                             div .cols {
                                 span { (if hand.won { "gagnée" } else { "chutée" }) " de " (hand.won_or_lost_by) }
-                                @if hand.petit_au_bout { span { "avec petit au bout" } }
+                                @match hand.petit_au_bout {
+                                    PetitAuBout::YesForTheBidder => span { "petit au bout pour le preneur" },
+                                    PetitAuBout::YesForTheDefence => span { "petit au bout pour la défense" },
+                                    PetitAuBout::No => span { "" }
+                                }
                                 @if hand.poignee != Poignée::Aucune { span { "avec une poignée " (hand.poignee) } }
                                 @if hand.chelem != Chelem::Aucun { span { "avec un chelem " (hand.chelem) } }
                             }

@@ -1,4 +1,4 @@
-use crate::game::{hand_number_and_table, Bid, Chelem, CompletedHand, Game, Poignée, ValidationError};
+use crate::game::{hand_number_and_table, Bid, Chelem, CompletedHand, Game, PetitAuBout, Poignée, ValidationError};
 
 fn lines(s: &str) -> Vec<String> {
     s.split('\n')
@@ -78,7 +78,7 @@ pub fn form_data_to_hand(form_data: &Vec<(String, String)>) -> Result<CompletedH
     let won_or_lost_by = reqd_form_value(form_data, "wonOrLostBy")?
         .parse::<i32>()
         .unwrap();
-    let petit_au_bout = bool_form_value(form_data, "petitAuBout");
+    let petit_au_bout = reqd_form_value(form_data, "petitAuBout")?.parse::<PetitAuBout>().unwrap();
     let poignee = reqd_form_value(form_data, "poignee")?.parse::<Poignée>().unwrap();
     let chelem = reqd_form_value(form_data, "chelem")?.parse::<Chelem>().unwrap();
 

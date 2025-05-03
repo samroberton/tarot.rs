@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::game::{Bid, Chelem, CompletedHand, Poignée};
+use crate::game::{Bid, Chelem, CompletedHand, PetitAuBout, Poignée};
 
 impl Bid {
     pub fn multiplier(&self) -> i32 {
@@ -35,7 +35,15 @@ impl Chelem {
 }
 
 pub fn score(hand: &CompletedHand) -> Result<HashMap<String, i32>, String> {
-    let base_score = (25 + hand.won_or_lost_by + if hand.petit_au_bout { 10 } else { 0 }) * hand.bid.multiplier()
+    let petit_au_bout_score = match (hand.petit_au_bout.clone(), hand.won) {
+        (PetitAuBout::No, _) => 0,
+        (PetitAuBout::YesForTheBidder, true) => 10,
+        (PetitAuBout::YesForTheDefence, false) => 10,
+        (PetitAuBout::YesForTheBidder, false) => -10,
+        (PetitAuBout::YesForTheDefence, true) => -10,
+    };
+
+    let winner_score = (25 + hand.won_or_lost_by + petit_au_bout_score) * hand.bid.multiplier()
         + hand.poignee.score()
         + hand.chelem.score();
 
@@ -44,24 +52,24 @@ pub fn score(hand: &CompletedHand) -> Result<HashMap<String, i32>, String> {
         (5, 4, _) => {
             // 5 players, bidder called themselves
             for player in &hand.defence {
-                scores.insert(player.clone(), if hand.won { -base_score } else { base_score });
+                scores.insert(player.clone(), if hand.won { -winner_score } else { winner_score });
             }
-            scores.insert(hand.bidder.clone(), 4 * if hand.won { base_score } else { -base_score });
+            scores.insert(hand.bidder.clone(), 4 * if hand.won { winner_score } else { -winner_score });
         },
         (5, _, Some(partner)) => {
             // 5 players, bidder and partner are different players
             for player in &hand.defence {
-                scores.insert(player.clone(), if hand.won { -base_score } else { base_score });
+                scores.insert(player.clone(), if hand.won { -winner_score } else { winner_score });
             }
-            scores.insert(hand.bidder.clone(), 2 * if hand.won { base_score } else { -base_score });
-            scores.insert(partner.clone(), if hand.won { base_score } else { -base_score });
+            scores.insert(hand.bidder.clone(), 2 * if hand.won { winner_score } else { -winner_score });
+            scores.insert(partner.clone(), if hand.won { winner_score } else { -winner_score });
         },
         (4, _, _) => {
             // 4 players
             for player in &hand.defence {
-                scores.insert(player.clone(), if hand.won { -base_score } else { base_score });
+                scores.insert(player.clone(), if hand.won { -winner_score } else { winner_score });
             }
-            scores.insert(hand.bidder.clone(), 3 * if hand.won { base_score } else { -base_score });
+            scores.insert(hand.bidder.clone(), 3 * if hand.won { winner_score } else { -winner_score });
         },
         _ => return Err(format!("Invalid hand configuration: {:?}", hand)),
     }
@@ -137,7 +145,7 @@ mod tests {
             defence: vec!["Bob".to_string(), "Charlie".to_string(), "David".to_string()],
             won: true,
             won_or_lost_by: 10,
-            petit_au_bout: false,
+            petit_au_bout: PetitAuBout::No,
             poignee: Poignée::Aucune,
             chelem: Chelem::Aucun,
         };
@@ -164,7 +172,7 @@ mod tests {
             defence: vec!["Charlie".to_string(), "David".to_string(), "Eve".to_string()],
             won: true,
             won_or_lost_by: 15,
-            petit_au_bout: true,
+            petit_au_bout: PetitAuBout::YesForTheBidder,
             poignee: Poignée::Simple,
             chelem: Chelem::Aucun,
         };
@@ -192,7 +200,7 @@ mod tests {
             defence: vec!["Bob".to_string(), "Charlie".to_string(), "David".to_string(), "Eve".to_string()],
             won: false,
             won_or_lost_by: 20,
-            petit_au_bout: false,
+            petit_au_bout: PetitAuBout::No,
             poignee: Poignée::Aucune,
             chelem: Chelem::Aucun,
         };
@@ -220,7 +228,7 @@ mod tests {
             defence: vec!["Bob".to_string(), "Charlie".to_string(), "David".to_string()],
             won: true,
             won_or_lost_by: 30,
-            petit_au_bout: true,
+            petit_au_bout: PetitAuBout::YesForTheBidder,
             poignee: Poignée::Double,
             chelem: Chelem::Annoncé,
         };
@@ -247,7 +255,7 @@ mod tests {
             defence: vec!["Bob".to_string(), "Charlie".to_string()],
             won: true,
             won_or_lost_by: 10,
-            petit_au_bout: false,
+            petit_au_bout: PetitAuBout::No,
             poignee: Poignée::Aucune,
             chelem: Chelem::Aucun,
         };

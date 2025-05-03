@@ -1,16 +1,16 @@
+use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::str::FromStr;
-use lazy_static::lazy_static;
 
 use aws_sdk_dynamodb::error::SdkError;
 use aws_sdk_dynamodb::operation::{
-    get_item::GetItemError, put_item::PutItemError, delete_item::DeleteItemError, query::QueryError,
+    delete_item::DeleteItemError, get_item::GetItemError, put_item::PutItemError, query::QueryError,
 };
 use aws_sdk_dynamodb::types::AttributeValue;
 use aws_sdk_dynamodb::Client;
 use thiserror::Error;
 
-use crate::game::{Bid, Chelem, CompletedHand, Game, Poignée};
+use crate::game::{Bid, Chelem, CompletedHand, Game, PetitAuBout, Poignée};
 
 lazy_static! {
     static ref APP_NAME: String = std::env::var("APP_NAME").unwrap_or("tarot".to_string());
@@ -53,7 +53,7 @@ pub async fn get_game(client: &Client, game_id: &str) -> Result<Option<Game>, Db
             date: get_s(&item, "date")?,
             host: get_s(&item, "host")?,
             players: get_l_of_s(&item, "players")?,
-            tables: get_l_of_s(&item, "tables")?
+            tables: get_l_of_s(&item, "tables")?,
         };
         Ok(Some(game))
     } else {
@@ -80,24 +80,18 @@ fn item_to_completed_hand(item: HashMap<String, AttributeValue>) -> Result<Compl
         table: get_s(&item, "table")?,
         hand_number: get_n(&item, "handNumber")?,
         players: get_l_of_s(&item, "players")?,
-        bid: Bid::from_str(
-            get_s(&item, "bid")?.as_str(),
-        )
-        .map_err(|e| DbError::Validation(format!("Invalid bid {:?}", e.to_string())))?,
+        bid: Bid::from_str(get_s(&item, "bid")?.as_str())
+            .map_err(|e| DbError::Validation(format!("Invalid bid {:?}", e.to_string())))?,
         bidder: get_s(&item, "bidder")?,
         partner: get_option_s(&item, "partner")?,
         defence: get_l_of_s(&item, "defence")?,
         won: get_bool(&item, "won")?,
         won_or_lost_by: get_n(&item, "wonOrLostBy")?,
-        petit_au_bout: get_bool(&item, "petitAuBout")?,
-        poignee: Poignée::from_str(
-            get_s(&item, "poignee")?.as_str(),
-        )
-        .map_err(|e| DbError::Validation(format!("Invalid poignee {:?}", e.to_string())))?,
-        chelem: Chelem::from_str(
-            get_s(&item, "chelem")?.as_str(),
-        )
-        .map_err(|e| DbError::Validation(format!("Invalid chelem {:?}", e.to_string())))?,
+        petit_au_bout: get_petit_au_bout(&item)?,
+        poignee: Poignée::from_str(get_s(&item, "poignee")?.as_str())
+            .map_err(|e| DbError::Validation(format!("Invalid poignee {:?}", e.to_string())))?,
+        chelem: Chelem::from_str(get_s(&item, "chelem")?.as_str())
+            .map_err(|e| DbError::Validation(format!("Invalid chelem {:?}", e.to_string())))?,
     })
 }
 
@@ -145,7 +139,7 @@ pub async fn put_hand(client: &Client, game_id: &str, hand: &CompletedHand) -> R
         .item("defence", to_l_of_s(&hand.defence))
         .item("won", AttributeValue::Bool(hand.won))
         .item("wonOrLostBy", to_n(hand.won_or_lost_by))
-        .item("petitAuBout", AttributeValue::Bool(hand.petit_au_bout))
+        .item("petitAuBout", AttributeValue::S(hand.petit_au_bout.to_string()))
         .item("poignee", AttributeValue::S(hand.poignee.to_string()))
         .item("chelem", AttributeValue::S(hand.chelem.to_string()))
         .send()
@@ -179,7 +173,7 @@ fn get_option_s(
                 "Attribute {:?} is not a string: {:?}",
                 key, v
             ))),
-        }
+        },
     }
 }
 
@@ -198,7 +192,7 @@ fn get_s(
                 "Attribute {:?} is not a string: {:?}",
                 key, v
             ))),
-        }
+        },
     }
 }
 
@@ -213,13 +207,16 @@ fn get_n(
         ))),
         Some(attr_val) => match attr_val {
             AttributeValue::N(s) => s.parse().map_err(|e| {
-                DbError::Validation(format!("Can't parse attribute {:?} as a number: {:?}", key, e))
+                DbError::Validation(format!(
+                    "Can't parse attribute {:?} as a number: {:?}",
+                    key, e
+                ))
             }),
             v => Err(DbError::Validation(format!(
                 "Attribute {:?} is not a number: {:?}",
                 key, v
             ))),
-        }
+        },
     }
 }
 
@@ -238,7 +235,33 @@ fn get_bool(
                 "Attribute {:?} is not a boolean: {:?}",
                 key, v
             ))),
-        }
+        },
+    }
+}
+
+fn get_petit_au_bout(
+    item: &std::collections::HashMap<String, AttributeValue>,
+) -> Result<PetitAuBout, DbError> {
+    match item.get("petitAuBout") {
+        None => Err(DbError::Validation(format!(
+            "Missing attribute {:?} in: {:?}",
+            "petitAuBout", item
+        ))),
+        Some(attr_val) => match attr_val {
+            AttributeValue::S(s) => PetitAuBout::from_str(s.as_str()).map_err(|e| {
+                DbError::Validation(format!("Invalid petitAuBout {:?}", e.to_string()))
+            }),
+            // originally a boolean, but now a string
+            AttributeValue::Bool(b) => Ok(if *b {
+                PetitAuBout::YesForTheBidder
+            } else {
+                PetitAuBout::No
+            }),
+            v => Err(DbError::Validation(format!(
+                "Attribute {:?} is not a boolean: {:?}",
+                "petitAuBout", v
+            ))),
+        },
     }
 }
 
@@ -259,27 +282,16 @@ fn get_l_of_s(
                     v => Err(DbError::Validation(format!(
                         "Item in attribute {:?} is not a string: {:?}",
                         key, v
-                    )))
+                    ))),
                 })
                 .collect(),
             v => Err(DbError::Validation(format!(
                 "Attribute {:?} is not a list: {:?}",
                 key, v
-            )))
-        }
+            ))),
+        },
     }
 }
-
-// item
-//     .get("tables")
-//     .unwrap()
-//     .as_l()
-//     .unwrap()
-//     .iter()
-//     .map(|v| v.as_s().unwrap().clone())
-//     .collect(),
-
-
 
 fn to_s(s: &String) -> AttributeValue {
     AttributeValue::S(s.clone())
